@@ -4,3 +4,5 @@ php:
 - 5.4
 - hhvm
 script: phpunit Test.php
+notifications:
+  slack: kmucloudusb:rrHykwADe78GMkPk1988y4X5
