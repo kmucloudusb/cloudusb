@@ -84,7 +84,69 @@ void show_file_status(FL_FILE *file){
     
 }
 
-
+/*
+ For test...
+ 
+ Folder structure
+ /folder1
+ /folder2/folder3
+ /folder4/folder5/folder6
+ 
+ Files
+ /tmp10.bin - (10bytes)
+ /folder1/tmp30.bin - (30bytes)
+ /folder2/folder3/tmp50.bin - (50bytes)
+ /folder4/folder5/tmp70.bin - (70bytes)
+ /folder4/folder5/folder6/tmp100.bin - (100bytes)
+ /tmp1G.bin - (1GB)
+ /tmp4G.bin - (4GB)
+ 
+ */
+void test()
+{
+    fl_createdirectory("/folder1");
+    fl_createdirectory("/folder2");
+    fl_createdirectory("/folder2/folder3");
+    fl_createdirectory("/folder4");
+    fl_createdirectory("/folder4/folder5");
+    fl_createdirectory("/folder4/folder5/folder6");
+    
+    FL_FILE *f1 = fl_fopen("/tmp10.bin", "w");
+    FL_FILE *f2 = fl_fopen("/folder1/tmp30.bin", "w");
+    FL_FILE *f3 = fl_fopen("/folder2/tmp50.bin", "w");
+    FL_FILE *f4 = fl_fopen("/folder4/folder5/tmp70.bin", "w");
+    FL_FILE *f5 = fl_fopen("/folder4/folder5/folder6/tmp100.bin", "w");
+    FL_FILE *f6 = fl_fopen("/tmp1G.bin", "w");
+    FL_FILE *f7 = fl_fopen("/tmp4G.bin", "w");
+    
+    f1->filelength = 10;
+    f1->filelength_changed = 1;
+    fl_fclose(f1);
+    
+    f2->filelength = 30;
+    f2->filelength_changed = 1;
+    fl_fclose(f2);
+    
+    f3->filelength = 50;
+    f3->filelength_changed = 1;
+    fl_fclose(f3);
+    
+    f4->filelength = 70;
+    f4->filelength_changed = 1;
+    fl_fclose(f4);
+    
+    f5->filelength = 100;
+    f5->filelength_changed = 1;
+    fl_fclose(f5);
+    
+    f6->filelength = 1000000000;
+    f6->filelength_changed = 1;
+    fl_fclose(f6);
+    
+    f7->filelength = 4000000000;
+    f7->filelength_changed = 1;
+    fl_fclose(f7);
+}
 
 int main(void)
 {
