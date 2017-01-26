@@ -3,23 +3,21 @@
 #include <unistd.h>
 #include "fat_filelib.h"
 
-#define MEDIA_PATH "/dev/disk1"
-
 int in_file;
 int out_file;
 
-int media_init()
+int media_init(char *media_path)
 {
     
-    if((in_file = open(MEDIA_PATH, O_RDONLY)) < 0)
+    if((in_file = open(media_path, O_RDONLY)) < 0)
     {
-        perror("open in_file");
+        perror(media_path);
         exit(1);
     }
     
-    if((out_file = open(MEDIA_PATH, O_WRONLY)) < 0)
+    if((out_file = open(media_path, O_WRONLY)) < 0)
     {
-        perror("open out_file");
+        perror(media_path);
         exit(1);
     }
     
@@ -148,12 +146,17 @@ void test()
     fl_fclose(f7);
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     FL_FILE *file;
     
+    if (argc<2){
+        printf("Usage: \"sudo ./main.out PATH\" \n");
+        return 1;
+    }
+
     // Initialise media
-    media_init();
+    media_init(argv[1]);
     
     // Initialise File IO Library
     fl_init();
