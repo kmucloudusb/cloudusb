@@ -3,3 +3,7 @@
 *.out
 *.exe
 *.so
+
+# Security file #
+# google API secret number #
+client_secret.json
