@@ -146,6 +146,66 @@ void test()
     fl_fclose(f7);
 }
 
+/*
+ For test...
+ 
+ From PC to FAT32 file system storage
+ 
+ ex)
+ file_copy_test("/screen.png", "/Users/Desktop/world/screen.png");
+ 
+ */
+void file_copy_test(char *to, char *from){
+    
+    // File open
+    FILE *origin;
+    if ((origin = fopen(from, "rb")) == NULL) {
+        perror("fopen");
+        exit(1);
+    }
+    
+    // Get file size
+    fseek(origin, 0, SEEK_END);
+    int fsize = (int)ftell(origin);
+    fseek(origin, 0, SEEK_SET);
+    
+    // Read file
+#define MAX_BUF 1000000
+    
+    char buffer[MAX_BUF];
+    
+    int c;
+    for (int i = 0; i < fsize; ++i)
+    {
+        c = getc(origin);
+        
+        if (c == EOF)
+        {
+            buffer[i] = 0x00;
+            break;
+        }
+        
+        buffer[i] = c;
+    }
+    
+    // Open or create written file
+    FL_FILE *file;
+    file = fl_fopen(to, "w");
+    
+    if (file)
+    {
+        // Write some data
+        if (fl_fwrite(buffer, 1, fsize, file) < fsize)
+            printf("ERROR: Write file failed\n");
+    }
+    else
+        printf("ERROR: Create file failed\n");
+    
+    // Close file
+    fl_fclose(origin);
+    fl_fclose(file);
+}
+
 int main(int argc, char *argv[])
 {
     FL_FILE *file;
