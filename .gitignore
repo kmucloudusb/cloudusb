@@ -5,5 +5,5 @@
 *.so
 
 # Security file #
-# google API secret number #
+# google API secret data #
 client_secret.json
