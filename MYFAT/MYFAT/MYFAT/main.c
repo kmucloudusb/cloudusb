@@ -15,7 +15,13 @@ int main(int argc, char *argv[])
 {
     FL_FILE *file;
 
-    media_init("/Users/lunahc92/Desktop/test.dmg");
+    if (media_init("/Users/lunahc92/Desktop/test.dmg") != 1)
+    {
+        puts("media_init error");
+        return -1;
+    }
+    
+    fl_init();
     
     media_close();
 }
@@ -25,13 +31,13 @@ int media_init(char *media_path)
     if((in_file = open(media_path, O_RDONLY)) < 0)
     {
         perror(media_path);
-        exit(1);
+        return -1;
     }
     
     if((out_file = open(media_path, O_WRONLY)) < 0)
     {
         perror(media_path);
-        exit(1);
+        return -1;
     }
     
     return 1;
