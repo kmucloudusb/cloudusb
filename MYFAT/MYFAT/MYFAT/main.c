@@ -23,6 +23,12 @@ int main(int argc, char *argv[])
     
     fl_init();
     
+    if (fl_attach_media(media_read, media_write) != FAT_INIT_OK)
+    {
+        printf("ERROR: Media attach failed\n");
+        return 1;
+    }
+    
     media_close();
 }
 

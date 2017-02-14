@@ -254,6 +254,7 @@
 				AE9430DC1E52A171003AFB75 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
