@@ -5,6 +5,7 @@
 #include "fat_defs.h"
 #include "fat_opts.h"
 #include "fat_types.h"
+#include "fat_string.h"
 
 //
 //
@@ -69,10 +70,6 @@ typedef struct sFL_FILE
 //
 // fl_init
 
-#ifndef FAT_ASSERT
-#define FAT_ASSERT(x)
-#endif
-
 #define fat_list_first(l)           (l)->head
 
 static struct fat_list    _open_file_list;
@@ -82,16 +79,11 @@ static int                _filelib_init = 0;
 
 static void fat_list_init(struct fat_list *list)
 {
-    FAT_ASSERT(list);
-    
     list->head = list->tail = 0;
 }
 
 static void fat_list_remove(struct fat_list *list, struct fat_node *node)
 {
-    FAT_ASSERT(list);
-    FAT_ASSERT(node);
-    
     if(!node->previous)
         list->head = node->next;
     else
@@ -105,10 +97,6 @@ static void fat_list_remove(struct fat_list *list, struct fat_node *node)
 
 static void fat_list_insert_after(struct fat_list *list, struct fat_node *node, struct fat_node *new_node)
 {
-    FAT_ASSERT(list);
-    FAT_ASSERT(node);
-    FAT_ASSERT(new_node);
-    
     new_node->previous = node;
     new_node->next = node->next;
     if (!node->next)
@@ -120,10 +108,6 @@ static void fat_list_insert_after(struct fat_list *list, struct fat_node *node, 
 
 static void fat_list_insert_before(struct fat_list *list, struct fat_node *node, struct fat_node *new_node)
 {
-    FAT_ASSERT(list);
-    FAT_ASSERT(node);
-    FAT_ASSERT(new_node);
-    
     new_node->previous = node->previous;
     new_node->next = node;
     if (!node->previous)
@@ -135,9 +119,6 @@ static void fat_list_insert_before(struct fat_list *list, struct fat_node *node,
 
 static void fat_list_insert_first(struct fat_list *list, struct fat_node *node)
 {
-    FAT_ASSERT(list);
-    FAT_ASSERT(node);
-    
     if (!list->head)
     {
         list->head = node;
@@ -151,9 +132,6 @@ static void fat_list_insert_first(struct fat_list *list, struct fat_node *node)
 
 static void fat_list_insert_last(struct fat_list *list, struct fat_node *node)
 {
-    FAT_ASSERT(list);
-    FAT_ASSERT(node);
-    
     if (!list->tail)
         fat_list_insert_first(list, node);
     else
@@ -162,16 +140,12 @@ static void fat_list_insert_last(struct fat_list *list, struct fat_node *node)
 
 static int fat_list_is_empty(struct fat_list *list)
 {
-    FAT_ASSERT(list);
-    
     return !list->head;
 }
 
 static struct fat_node * fat_list_pop_head(struct fat_list *list)
 {
     struct fat_node * node;
-    
-    FAT_ASSERT(list);
     
     node = fat_list_first(list);
     if (node)
@@ -213,8 +187,6 @@ void fl_init(void)
 ( ((uint32)buffer[location+3]<<24) + ((uint32)buffer[location+2]<<16) + ((uint32)buffer[location+1]<<8) + (uint32)buffer[location+0] )
 #define GET_16BIT_WORD(buffer, location)    \
 ( ((uint16)buffer[location+1]<<8) + (uint16)buffer[location+0] )
-
-#define CHECK_FL_INIT()     { if (_filelib_init==0) fl_init(); }
 
 typedef int (*fn_diskio_read) (uint32 sector, uint8 *buffer, uint32 sector_count);
 typedef int (*fn_diskio_write)(uint32 sector, uint8 *buffer, uint32 sector_count);
@@ -453,9 +425,6 @@ int fl_attach_media(fn_diskio_read rd, fn_diskio_write wr)
 {
     int res;
     
-    // If first call to library, initialise
-    CHECK_FL_INIT();
-    
     _fs.disk_io.read_media = rd;
     _fs.disk_io.write_media = wr;
     
@@ -468,6 +437,740 @@ int fl_attach_media(fn_diskio_read rd, fn_diskio_write wr)
     
     _filelib_valid = 1;
     return FAT_INIT_OK;
+}
+
+
+
+//
+//
+// fl_listdirectory
+
+#define FL_LOCK(a)          do { if ((a)->fl_lock) (a)->fl_lock(); } while (0)
+#define FL_UNLOCK(a)        do { if ((a)->fl_unlock) (a)->fl_unlock(); } while (0)
+
+#define FAT_DIR_ENTRIES_PER_SECTOR          (FAT_SECTOR_SIZE / FAT_DIR_ENTRY_SIZE)
+
+#define FAT32_GET_32BIT_WORD(pbuf, location)        ( GET_32BIT_WORD(pbuf->ptr, location) )
+#define FAT32_SET_32BIT_WORD(pbuf, location, value) { SET_32BIT_WORD(pbuf->ptr, location, value); pbuf->dirty = 1; }
+#define FAT16_GET_16BIT_WORD(pbuf, location)        ( GET_16BIT_WORD(pbuf->ptr, location) )
+#define FAT16_SET_16BIT_WORD(pbuf, location, value) { SET_16BIT_WORD(pbuf->ptr, location, value); pbuf->dirty = 1; }
+
+#define MAX_LONGFILENAME_ENTRIES    20
+#define MAX_LFN_ENTRY_LENGTH        13
+
+typedef struct fs_dir_list_status
+{
+    uint32                  sector;
+    uint32                  cluster;
+    uint8                   offset;
+}FL_DIR;
+
+typedef struct fs_dir_ent
+{
+    char                    filename[FATFS_MAX_LONG_FILENAME];
+    uint8                   is_dir;
+    uint32                  cluster;
+    uint32                  size;
+    
+#if FATFS_INC_TIME_DATE_SUPPORT
+    uint16                  access_date;
+    uint16                  write_time;
+    uint16                  write_date;
+    uint16                  create_date;
+    uint16                  create_time;
+#endif
+}fl_dirent;
+
+static int fatfs_fat_writeback(struct fatfs *fs, struct fat_buffer *pcur)
+{
+    if (pcur)
+    {
+        // Writeback sector if changed
+        if (pcur->dirty)
+        {
+            if (fs->disk_io.write_media)
+            {
+                uint32 sectors = FAT_BUFFER_SECTORS;
+                uint32 offset = pcur->address - fs->fat_begin_lba;
+                
+                // Limit to sectors used for the FAT
+                if ((offset + FAT_BUFFER_SECTORS) <= fs->fat_sectors)
+                    sectors = FAT_BUFFER_SECTORS;
+                else
+                    sectors = fs->fat_sectors - offset;
+                
+                if (!fs->disk_io.write_media(pcur->address, pcur->sector, sectors))
+                    return 0;
+            }
+            
+            pcur->dirty = 0;
+        }
+        
+        return 1;
+    }
+    else
+        return 0;
+}
+
+static struct fat_buffer *fatfs_fat_read_sector(struct fatfs *fs, uint32 sector)
+{
+    struct fat_buffer *last = NULL;
+    struct fat_buffer *pcur = fs->fat_buffer_head;
+    
+    // Itterate through sector buffer list
+    while (pcur)
+    {
+        // Sector within this buffer?
+        if ((sector >= pcur->address) && (sector < (pcur->address + FAT_BUFFER_SECTORS)))
+            break;
+        
+        // End of list?
+        if (pcur->next == NULL)
+        {
+            // Remove buffer from list
+            if (last)
+                last->next = NULL;
+            // We the first and last buffer in the chain?
+            else
+                fs->fat_buffer_head = NULL;
+        }
+        
+        last = pcur;
+        pcur = pcur->next;
+    }
+    
+    // We found the sector already in FAT buffer chain
+    if (pcur)
+    {
+        pcur->ptr = (uint8 *)(pcur->sector + ((sector - pcur->address) * FAT_SECTOR_SIZE));
+        return pcur;
+    }
+    
+    // Else, we removed the last item from the list
+    pcur = last;
+    
+    // Add to start of sector buffer list (now newest sector)
+    pcur->next = fs->fat_buffer_head;
+    fs->fat_buffer_head = pcur;
+    
+    // Writeback sector if changed
+    if (pcur->dirty)
+        if (!fatfs_fat_writeback(fs, pcur))
+            return 0;
+    
+    // Address is now new sector
+    pcur->address = sector;
+    
+    // Read next sector
+    if (!fs->disk_io.read_media(pcur->address, pcur->sector, FAT_BUFFER_SECTORS))
+    {
+        // Read failed, invalidate buffer address
+        pcur->address = FAT32_INVALID_CLUSTER;
+        return NULL;
+    }
+    
+    pcur->ptr = pcur->sector;
+    return pcur;
+}
+
+uint32 fatfs_get_root_cluster(struct fatfs *fs)
+{
+    // NOTE: On FAT16 this will be 0 which has a special meaning...
+    return fs->rootdir_first_cluster;
+}
+
+uint32 fatfs_find_next_cluster(struct fatfs *fs, uint32 current_cluster)
+{
+    uint32 fat_sector_offset, position;
+    uint32 nextcluster;
+    struct fat_buffer *pbuf;
+    
+    // Why is '..' labelled with cluster 0 when it should be 2 ??
+    if (current_cluster == 0)
+        current_cluster = 2;
+    
+    // Find which sector of FAT table to read
+    if (fs->fat_type == FAT_TYPE_16)
+        fat_sector_offset = current_cluster / 256;
+    else
+        fat_sector_offset = current_cluster / 128;
+    
+    // Read FAT sector into buffer
+    pbuf = fatfs_fat_read_sector(fs, fs->fat_begin_lba+fat_sector_offset);
+    if (!pbuf)
+        return (FAT32_LAST_CLUSTER);
+    
+    if (fs->fat_type == FAT_TYPE_16)
+    {
+        // Find 32 bit entry of current sector relating to cluster number
+        position = (current_cluster - (fat_sector_offset * 256)) * 2;
+        
+        // Read Next Clusters value from Sector Buffer
+        nextcluster = FAT16_GET_16BIT_WORD(pbuf, (uint16)position);
+        
+        // If end of chain found
+        if (nextcluster >= 0xFFF8 && nextcluster <= 0xFFFF)
+            return (FAT32_LAST_CLUSTER);
+    }
+    else
+    {
+        // Find 32 bit entry of current sector relating to cluster number
+        position = (current_cluster - (fat_sector_offset * 128)) * 4;
+        
+        // Read Next Clusters value from Sector Buffer
+        nextcluster = FAT32_GET_32BIT_WORD(pbuf, (uint16)position);
+        
+        // Mask out MS 4 bits (its 28bit addressing)
+        nextcluster = nextcluster & 0x0FFFFFFF;
+        
+        // If end of chain found
+        if (nextcluster >= 0x0FFFFFF8 && nextcluster <= 0x0FFFFFFF)
+            return (FAT32_LAST_CLUSTER);
+    }
+    
+    // Else return next cluster
+    return (nextcluster);
+}
+
+uint32 fatfs_lba_of_cluster(struct fatfs *fs, uint32 Cluster_Number)
+{
+    if (fs->fat_type == FAT_TYPE_16)
+        return (fs->cluster_begin_lba + (fs->root_entry_count * 32 / FAT_SECTOR_SIZE) + ((Cluster_Number-2) * fs->sectors_per_cluster));
+    else
+        return ((fs->cluster_begin_lba + ((Cluster_Number-2)*fs->sectors_per_cluster)));
+}
+
+int fatfs_sector_reader(struct fatfs *fs, uint32 start_cluster, uint32 offset, uint8 *target)
+{
+    uint32 sector_to_read = 0;
+    uint32 cluster_to_read = 0;
+    uint32 cluster_chain = 0;
+    uint32 i;
+    uint32 lba;
+    
+    // FAT16 Root directory
+    if (fs->fat_type == FAT_TYPE_16 && start_cluster == 0)
+    {
+        if (offset < fs->rootdir_sectors)
+            lba = fs->lba_begin + fs->rootdir_first_sector + offset;
+        else
+            return 0;
+    }
+    // FAT16/32 Other
+    else
+    {
+        // Set start of cluster chain to initial value
+        cluster_chain = start_cluster;
+        
+        // Find parameters
+        cluster_to_read = offset / fs->sectors_per_cluster;
+        sector_to_read = offset - (cluster_to_read*fs->sectors_per_cluster);
+        
+        // Follow chain to find cluster to read
+        for (i=0; i<cluster_to_read; i++)
+            cluster_chain = fatfs_find_next_cluster(fs, cluster_chain);
+        
+        // If end of cluster chain then return false
+        if (cluster_chain == FAT32_LAST_CLUSTER)
+            return 0;
+        
+        // Calculate sector address
+        lba = fatfs_lba_of_cluster(fs, cluster_chain)+sector_to_read;
+    }
+    
+    // User provided target array
+    if (target)
+        return fs->disk_io.read_media(lba, target, 1);
+    // Else read sector if not already loaded
+    else if (lba != fs->currentsector.address)
+    {
+        fs->currentsector.address = lba;
+        return fs->disk_io.read_media(fs->currentsector.address, fs->currentsector.sector, 1);
+    }
+    else
+        return 1;
+}
+
+int fatfs_entry_sfn_only(struct fat_dir_entry *entry)
+{
+    if ( (entry->Attr!=FILE_ATTR_LFN_TEXT) &&
+        (entry->Name[0]!=FILE_HEADER_BLANK) &&
+        (entry->Name[0]!=FILE_HEADER_DELETED) &&
+        (entry->Attr!=FILE_ATTR_VOLUME_ID) &&
+        (!(entry->Attr&FILE_ATTR_SYSHID)) )
+        return 1;
+    else
+        return 0;
+}
+
+int fatfs_entry_is_dir(struct fat_dir_entry *entry)
+{
+    if (entry->Attr & FILE_TYPE_DIR)
+        return 1;
+    else
+        return 0;
+}
+
+struct lfn_cache
+{
+#if FATFS_INC_LFN_SUPPORT
+    // Long File Name Structure (max 260 LFN length)
+    uint8 String[MAX_LONGFILENAME_ENTRIES][MAX_LFN_ENTRY_LENGTH];
+    uint8 Null;
+#endif
+    uint8 no_of_strings;
+};
+
+void fatfs_lfn_cache_init(struct lfn_cache *lfn, int wipeTable)
+{
+    int i = 0;
+    
+    lfn->no_of_strings = 0;
+    
+#if FATFS_INC_LFN_SUPPORT
+    
+    // Zero out buffer also
+    if (wipeTable)
+        for (i=0;i<MAX_LONGFILENAME_ENTRIES;i++)
+            memset(lfn->String[i], 0x00, MAX_LFN_ENTRY_LENGTH);
+#endif
+}
+
+int fatfs_entry_lfn_text(struct fat_dir_entry *entry)
+{
+    if ((entry->Attr & FILE_ATTR_LFN_TEXT) == FILE_ATTR_LFN_TEXT)
+        return 1;
+    else
+        return 0;
+}
+
+void fatfs_lfn_cache_entry(struct lfn_cache *lfn, uint8 *entryBuffer)
+{
+    uint8 LFNIndex, i;
+    LFNIndex = entryBuffer[0] & 0x1F;
+    
+    // Limit file name to cache size!
+    if (LFNIndex > MAX_LONGFILENAME_ENTRIES)
+        return ;
+    
+    // This is an error condition
+    if (LFNIndex == 0)
+        return ;
+    
+    if (lfn->no_of_strings == 0)
+        lfn->no_of_strings = LFNIndex;
+    
+    lfn->String[LFNIndex-1][0] = entryBuffer[1];
+    lfn->String[LFNIndex-1][1] = entryBuffer[3];
+    lfn->String[LFNIndex-1][2] = entryBuffer[5];
+    lfn->String[LFNIndex-1][3] = entryBuffer[7];
+    lfn->String[LFNIndex-1][4] = entryBuffer[9];
+    lfn->String[LFNIndex-1][5] = entryBuffer[0x0E];
+    lfn->String[LFNIndex-1][6] = entryBuffer[0x10];
+    lfn->String[LFNIndex-1][7] = entryBuffer[0x12];
+    lfn->String[LFNIndex-1][8] = entryBuffer[0x14];
+    lfn->String[LFNIndex-1][9] = entryBuffer[0x16];
+    lfn->String[LFNIndex-1][10] = entryBuffer[0x18];
+    lfn->String[LFNIndex-1][11] = entryBuffer[0x1C];
+    lfn->String[LFNIndex-1][12] = entryBuffer[0x1E];
+    
+    for (i=0; i<MAX_LFN_ENTRY_LENGTH; i++)
+        if (lfn->String[LFNIndex-1][i]==0xFF)
+            lfn->String[LFNIndex-1][i] = 0x20; // Replace with spaces
+}
+
+int fatfs_entry_lfn_invalid(struct fat_dir_entry *entry)
+{
+    if ( (entry->Name[0]==FILE_HEADER_BLANK)  ||
+        (entry->Name[0]==FILE_HEADER_DELETED)||
+        (entry->Attr==FILE_ATTR_VOLUME_ID) ||
+        (entry->Attr & FILE_ATTR_SYSHID) )
+        return 1;
+    else
+        return 0;
+}
+
+int fatfs_entry_lfn_exists(struct lfn_cache *lfn, struct fat_dir_entry *entry)
+{
+    if ( (entry->Attr!=FILE_ATTR_LFN_TEXT) &&
+        (entry->Name[0]!=FILE_HEADER_BLANK) &&
+        (entry->Name[0]!=FILE_HEADER_DELETED) &&
+        (entry->Attr!=FILE_ATTR_VOLUME_ID) &&
+        (!(entry->Attr&FILE_ATTR_SYSHID)) &&
+        (lfn->no_of_strings) )
+        return 1;
+    else
+        return 0;
+}
+
+char* fatfs_lfn_cache_get(struct lfn_cache *lfn)
+{
+    // Null terminate long filename
+    if (lfn->no_of_strings == MAX_LONGFILENAME_ENTRIES)
+        lfn->Null = '\0';
+    else if (lfn->no_of_strings)
+        lfn->String[lfn->no_of_strings][0] = '\0';
+    else
+        lfn->String[0][0] = '\0';
+    
+    return (char*)&lfn->String[0][0];
+}
+
+uint32 fatfs_get_file_entry(struct fatfs *fs, uint32 Cluster, char *name_to_find, struct fat_dir_entry *sfEntry)
+{
+    uint8 item=0;
+    uint16 recordoffset = 0;
+    uint8 i=0;
+    int x=0;
+    char *long_filename = NULL;
+    char short_filename[13];
+    struct lfn_cache lfn;
+    int dotRequired = 0;
+    struct fat_dir_entry *directoryEntry;
+    
+    fatfs_lfn_cache_init(&lfn, 1);
+    
+    // Main cluster following loop
+    while (1)
+    {
+        // Read sector
+        if (fatfs_sector_reader(fs, Cluster, x++, 0)) // If sector read was successfull
+        {
+            // Analyse Sector
+            for (item = 0; item < FAT_DIR_ENTRIES_PER_SECTOR; item++)
+            {
+                // Create the multiplier for sector access
+                recordoffset = FAT_DIR_ENTRY_SIZE * item;
+                
+                // Overlay directory entry over buffer
+                directoryEntry = (struct fat_dir_entry*)(fs->currentsector.sector+recordoffset);
+                
+#if FATFS_INC_LFN_SUPPORT
+                // Long File Name Text Found
+                if (fatfs_entry_lfn_text(directoryEntry) )
+                    fatfs_lfn_cache_entry(&lfn, fs->currentsector.sector+recordoffset);
+                
+                // If Invalid record found delete any long file name information collated
+                else if (fatfs_entry_lfn_invalid(directoryEntry) )
+                    fatfs_lfn_cache_init(&lfn, 0);
+                
+                // Normal SFN Entry and Long text exists
+                else if (fatfs_entry_lfn_exists(&lfn, directoryEntry) )
+                {
+                    long_filename = fatfs_lfn_cache_get(&lfn);
+                    
+                    // Compare names to see if they match
+                    if (fatfs_compare_names(long_filename, name_to_find))
+                    {
+                        memcpy(sfEntry,directoryEntry,sizeof(struct fat_dir_entry));
+                        return 1;
+                    }
+                    
+                    fatfs_lfn_cache_init(&lfn, 0);
+                }
+                else
+#endif
+                    // Normal Entry, only 8.3 Text
+                    if (fatfs_entry_sfn_only(directoryEntry) )
+                    {
+                        memset(short_filename, 0, sizeof(short_filename));
+                        
+                        // Copy name to string
+                        for (i=0; i<8; i++)
+                            short_filename[i] = directoryEntry->Name[i];
+                        
+                        // Extension
+                        dotRequired = 0;
+                        for (i=8; i<11; i++)
+                        {
+                            short_filename[i+1] = directoryEntry->Name[i];
+                            if (directoryEntry->Name[i] != ' ')
+                                dotRequired = 1;
+                        }
+                        
+                        // Dot only required if extension present
+                        if (dotRequired)
+                        {
+                            // If not . or .. entry
+                            if (short_filename[0]!='.')
+                                short_filename[8] = '.';
+                            else
+                                short_filename[8] = ' ';
+                        }
+                        else
+                            short_filename[8] = ' ';
+                        
+                        // Compare names to see if they match
+                        if (fatfs_compare_names(short_filename, name_to_find))
+                        {
+                            memcpy(sfEntry,directoryEntry,sizeof(struct fat_dir_entry));
+                            return 1;
+                        }
+                        
+                        fatfs_lfn_cache_init(&lfn, 0);
+                    }
+            } // End of if
+        }
+        else
+            break;
+    } // End of while loop
+    
+    return 0;
+}
+
+
+static int _open_directory(char *path, uint32 *pathCluster)
+{
+    int levels;
+    int sublevel;
+    char currentfolder[FATFS_MAX_LONG_FILENAME];
+    struct fat_dir_entry sfEntry;
+    uint32 startcluster;
+    
+    // Set starting cluster to root cluster
+    startcluster = fatfs_get_root_cluster(&_fs);
+    
+    // Find number of levels
+    levels = fatfs_total_path_levels(path);
+    
+    // Cycle through each level and get the start sector
+    for (sublevel=0;sublevel<(levels+1);sublevel++)
+    {
+        if (fatfs_get_substring(path, sublevel, currentfolder, sizeof(currentfolder)) == -1)
+            return 0;
+        
+        // Find clusteraddress for folder (currentfolder)
+        if (fatfs_get_file_entry(&_fs, startcluster, currentfolder,&sfEntry))
+        {
+            // Check entry is folder
+            if (fatfs_entry_is_dir(&sfEntry))
+                startcluster = ((FAT_HTONS((uint32)sfEntry.FstClusHI))<<16) + FAT_HTONS(sfEntry.FstClusLO);
+            else
+                return 0;
+        }
+        else
+            return 0;
+    }
+    
+    *pathCluster = startcluster;
+    return 1;
+}
+
+void fatfs_list_directory_start(struct fatfs *fs, struct fs_dir_list_status *dirls, uint32 StartCluster)
+{
+    dirls->cluster = StartCluster;
+    dirls->sector = 0;
+    dirls->offset = 0;
+}
+
+FL_DIR* fl_opendir(const char* path, FL_DIR *dir)
+{
+    int levels;
+    int res = 1;
+    uint32 cluster = FAT32_INVALID_CLUSTER;
+    
+    FL_LOCK(&_fs);
+    
+    levels = fatfs_total_path_levels((char*)path) + 1;
+    
+    // If path is in the root dir
+    if (levels == 0)
+        cluster = fatfs_get_root_cluster(&_fs);
+    // Find parent directory start cluster
+    else
+        res = _open_directory((char*)path, &cluster);
+    
+    if (res)
+        fatfs_list_directory_start(&_fs, dir, cluster);
+    
+    FL_UNLOCK(&_fs);
+    
+    return cluster != FAT32_INVALID_CLUSTER ? dir : 0;
+}
+
+int fatfs_list_directory_next(struct fatfs *fs, struct fs_dir_list_status *dirls, struct fs_dir_ent *entry)
+{
+    uint8 i,item;
+    uint16 recordoffset;
+    struct fat_dir_entry *directoryEntry;
+    char *long_filename = NULL;
+    char short_filename[13];
+    struct lfn_cache lfn;
+    int dotRequired = 0;
+    int result = 0;
+    
+    // Initialise LFN cache first
+    fatfs_lfn_cache_init(&lfn, 0);
+    
+    while (1)
+    {
+        // If data read OK
+        if (fatfs_sector_reader(fs, dirls->cluster, dirls->sector, 0))
+        {
+            // Maximum of 16 directory entries
+            for (item = dirls->offset; item < FAT_DIR_ENTRIES_PER_SECTOR; item++)
+            {
+                // Increase directory offset
+                recordoffset = FAT_DIR_ENTRY_SIZE * item;
+                
+                // Overlay directory entry over buffer
+                directoryEntry = (struct fat_dir_entry*)(fs->currentsector.sector+recordoffset);
+                
+#if FATFS_INC_LFN_SUPPORT
+                // Long File Name Text Found
+                if ( fatfs_entry_lfn_text(directoryEntry) )
+                    fatfs_lfn_cache_entry(&lfn, fs->currentsector.sector+recordoffset);
+                
+                // If Invalid record found delete any long file name information collated
+                else if ( fatfs_entry_lfn_invalid(directoryEntry) )
+                    fatfs_lfn_cache_init(&lfn, 0);
+                
+                // Normal SFN Entry and Long text exists
+                else if (fatfs_entry_lfn_exists(&lfn, directoryEntry) )
+                {
+                    // Get text
+                    long_filename = fatfs_lfn_cache_get(&lfn);
+                    strncpy(entry->filename, long_filename, FATFS_MAX_LONG_FILENAME-1);
+                    
+                    if (fatfs_entry_is_dir(directoryEntry))
+                        entry->is_dir = 1;
+                    else
+                        entry->is_dir = 0;
+                    
+#if FATFS_INC_TIME_DATE_SUPPORT
+                    // Get time / dates
+                    entry->create_time = ((uint16)directoryEntry->CrtTime[1] << 8) | directoryEntry->CrtTime[0];
+                    entry->create_date = ((uint16)directoryEntry->CrtDate[1] << 8) | directoryEntry->CrtDate[0];
+                    entry->access_date = ((uint16)directoryEntry->LstAccDate[1] << 8) | directoryEntry->LstAccDate[0];
+                    entry->write_time  = ((uint16)directoryEntry->WrtTime[1] << 8) | directoryEntry->WrtTime[0];
+                    entry->write_date  = ((uint16)directoryEntry->WrtDate[1] << 8) | directoryEntry->WrtDate[0];
+#endif
+                    
+                    entry->size = FAT_HTONL(directoryEntry->FileSize);
+                    entry->cluster = (FAT_HTONS(directoryEntry->FstClusHI)<<16) | FAT_HTONS(directoryEntry->FstClusLO);
+                    
+                    // Next starting position
+                    dirls->offset = item + 1;
+                    result = 1;
+                    return 1;
+                }
+                // Normal Entry, only 8.3 Text
+                else
+#endif
+                    if ( fatfs_entry_sfn_only(directoryEntry) )
+                    {
+                        fatfs_lfn_cache_init(&lfn, 0);
+                        
+                        memset(short_filename, 0, sizeof(short_filename));
+                        
+                        // Copy name to string
+                        for (i=0; i<8; i++)
+                            short_filename[i] = directoryEntry->Name[i];
+                        
+                        // Extension
+                        dotRequired = 0;
+                        for (i=8; i<11; i++)
+                        {
+                            short_filename[i+1] = directoryEntry->Name[i];
+                            if (directoryEntry->Name[i] != ' ')
+                                dotRequired = 1;
+                        }
+                        
+                        // Dot only required if extension present
+                        if (dotRequired)
+                        {
+                            // If not . or .. entry
+                            if (short_filename[0]!='.')
+                                short_filename[8] = '.';
+                            else
+                                short_filename[8] = ' ';
+                        }
+                        else
+                            short_filename[8] = ' ';
+                        
+                        fatfs_get_sfn_display_name(entry->filename, short_filename);
+                        
+                        if (fatfs_entry_is_dir(directoryEntry))
+                            entry->is_dir = 1;
+                        else
+                            entry->is_dir = 0;
+                        
+#if FATFS_INC_TIME_DATE_SUPPORT
+                        // Get time / dates
+                        entry->create_time = ((uint16)directoryEntry->CrtTime[1] << 8) | directoryEntry->CrtTime[0];
+                        entry->create_date = ((uint16)directoryEntry->CrtDate[1] << 8) | directoryEntry->CrtDate[0];
+                        entry->access_date = ((uint16)directoryEntry->LstAccDate[1] << 8) | directoryEntry->LstAccDate[0];
+                        entry->write_time  = ((uint16)directoryEntry->WrtTime[1] << 8) | directoryEntry->WrtTime[0];
+                        entry->write_date  = ((uint16)directoryEntry->WrtDate[1] << 8) | directoryEntry->WrtDate[0];
+#endif
+                        
+                        entry->size = FAT_HTONL(directoryEntry->FileSize);
+                        entry->cluster = (FAT_HTONS(directoryEntry->FstClusHI)<<16) | FAT_HTONS(directoryEntry->FstClusLO);
+                        
+                        // Next starting position
+                        dirls->offset = item + 1;
+                        result = 1;
+                        return 1;
+                    }
+            }// end of for
+            
+            // If reached end of the dir move onto next sector
+            dirls->sector++;
+            dirls->offset = 0;
+        }
+        else
+            break;
+    }
+    
+    return result;
+}
+
+int fl_readdir(FL_DIR *dirls, fl_dirent *entry)
+{
+    int res = 0;
+    
+    FL_LOCK(&_fs);
+    
+    res = fatfs_list_directory_next(&_fs, dirls, entry);
+    
+    FL_UNLOCK(&_fs);
+    
+    return res ? 0 : -1;
+}
+
+void fl_listdirectory(const char *path)
+{
+    FL_DIR dirstat;
+    
+    FL_LOCK(&_fs);
+    
+    FAT_PRINTF(("\r\nDirectory %s\r\n", path));
+    
+    if (fl_opendir(path, &dirstat))
+    {
+        struct fs_dir_ent dirent;
+        
+        while (fl_readdir(&dirstat, &dirent) == 0)
+        {
+#if FATFS_INC_TIME_DATE_SUPPORT
+            int d,m,y,h,mn,s;
+            fatfs_convert_from_fat_time(dirent.write_time, &h,&m,&s);
+            fatfs_convert_from_fat_date(dirent.write_date, &d,&mn,&y);
+            FAT_PRINTF(("%02d/%02d/%04d  %02d:%02d      ", d,mn,y,h,m));
+#endif
+            
+            if (dirent.is_dir)
+            {
+                FAT_PRINTF(("%s <DIR>\r\n", dirent.filename));
+            }
+            else
+            {
+                FAT_PRINTF(("%s [%d bytes]\r\n", dirent.filename, dirent.size));
+            }
+        }
+    }
+    
+    FL_UNLOCK(&_fs);
 }
 
 #endif /* header_h */

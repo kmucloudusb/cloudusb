@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AE9430D71E52A171003AFB75 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9430D61E52A171003AFB75 /* main.c */; };
+		AE9430E61E52AE06003AFB75 /* fat_string.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9430E41E52AE06003AFB75 /* fat_string.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -29,6 +30,8 @@
 		AE9430DE1E52A2F3003AFB75 /* fat_defs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fat_defs.h; sourceTree = "<group>"; };
 		AE9430DF1E52A2F3003AFB75 /* fat_opts.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fat_opts.h; sourceTree = "<group>"; };
 		AE9430E01E52A2FA003AFB75 /* fat_types.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fat_types.h; sourceTree = "<group>"; };
+		AE9430E41E52AE06003AFB75 /* fat_string.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_string.c; sourceTree = "<group>"; };
+		AE9430E51E52AE06003AFB75 /* fat_string.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_string.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,6 +69,8 @@
 				AE9430DE1E52A2F3003AFB75 /* fat_defs.h */,
 				AE9430DF1E52A2F3003AFB75 /* fat_opts.h */,
 				AE9430E01E52A2FA003AFB75 /* fat_types.h */,
+				AE9430E41E52AE06003AFB75 /* fat_string.c */,
+				AE9430E51E52AE06003AFB75 /* fat_string.h */,
 			);
 			path = MYFAT;
 			sourceTree = "<group>";
@@ -127,6 +132,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE9430E61E52AE06003AFB75 /* fat_string.c in Sources */,
 				AE9430D71E52A171003AFB75 /* main.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
