@@ -1173,4 +1173,1195 @@ void fl_listdirectory(const char *path)
     FL_UNLOCK(&_fs);
 }
 
+
+
+//
+//
+// fl_open
+
+#define fat_list_entry(p, t, m)     p ? ((t *)((char *)(p)-(char*)(&((t *)0)->m))) : 0
+#define fat_list_for_each(l, p)     for ((p) = (l)->head; (p); (p) = (p)->next)
+
+#define SET_32BIT_WORD(buffer, location, value)    { buffer[location+0] = (uint8)((value)&0xFF); \
+buffer[location+1] = (uint8)((value>>8)&0xFF); \
+buffer[location+2] = (uint8)((value>>16)&0xFF); \
+buffer[location+3] = (uint8)((value>>24)&0xFF); }
+#define FAT32_SET_32BIT_WORD(pbuf, location, value) { SET_32BIT_WORD(pbuf->ptr, location, value); pbuf->dirty = 1; }
+
+#define SET_16BIT_WORD(buffer, location, value)    { buffer[location+0] = (uint8)((value)&0xFF); \
+buffer[location+1] = (uint8)((value>>8)&0xFF); }
+#define FAT16_SET_16BIT_WORD(pbuf, location, value) { SET_16BIT_WORD(pbuf->ptr, location, value); pbuf->dirty = 1; }
+
+static FL_FILE* _allocate_file(void)
+{
+    // Allocate free file
+    struct fat_node *node = fat_list_pop_head(&_free_file_list);
+    
+    // Add to open list
+    if (node)
+        fat_list_insert_last(&_open_file_list, node);
+    
+    return fat_list_entry(node, FL_FILE, list_node);
+}
+
+static void _free_file(FL_FILE* file)
+{
+    // Remove from open list
+    fat_list_remove(&_open_file_list, &file->list_node);
+    
+    // Add to free list
+    fat_list_insert_last(&_free_file_list, &file->list_node);
+}
+
+static int _check_file_open(FL_FILE* file)
+{
+    struct fat_node *node;
+    
+    // Compare open files
+    fat_list_for_each(&_open_file_list, node)
+    {
+        FL_FILE* openFile = fat_list_entry(node, FL_FILE, list_node);
+        
+        // If not the current file
+        if (openFile != file)
+        {
+            // Compare path and name
+            if ( (fatfs_compare_names(openFile->path,file->path)) && (fatfs_compare_names(openFile->filename,file->filename)) )
+                return 1;
+        }
+    }
+    
+    return 0;
+}
+
+int fatfs_entry_is_file(struct fat_dir_entry *entry)
+{
+    if (entry->Attr & FILE_TYPE_FILE)
+        return 1;
+    else
+        return 0;
+}
+
+int fatfs_fat_purge(struct fatfs *fs)
+{
+    struct fat_buffer *pcur = fs->fat_buffer_head;
+    
+    // Itterate through sector buffer list
+    while (pcur)
+    {
+        // Writeback sector if changed
+        if (pcur->dirty)
+            if (!fatfs_fat_writeback(fs, pcur))
+                return 0;
+        
+        pcur = pcur->next;
+    }
+    
+    return 1;
+}
+
+static FL_FILE* _open_file(const char *path)
+{
+    FL_FILE* file;
+    struct fat_dir_entry sfEntry;
+    
+    // Allocate a new file handle
+    file = _allocate_file();
+    if (!file)
+        return NULL;
+    
+    // Clear filename
+    memset(file->path, '\0', sizeof(file->path));
+    memset(file->filename, '\0', sizeof(file->filename));
+    
+    // Split full path into filename and directory path
+    if (fatfs_split_path((char*)path, file->path, sizeof(file->path), file->filename, sizeof(file->filename)) == -1)
+    {
+        _free_file(file);
+        return NULL;
+    }
+    
+    // Check if file already open
+    if (_check_file_open(file))
+    {
+        _free_file(file);
+        return NULL;
+    }
+    
+    // If file is in the root dir
+    if (file->path[0]==0)
+        file->parentcluster = fatfs_get_root_cluster(&_fs);
+    else
+    {
+        // Find parent directory start cluster
+        if (!_open_directory(file->path, &file->parentcluster))
+        {
+            _free_file(file);
+            return NULL;
+        }
+    }
+    
+    // Using dir cluster address search for filename
+    if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename,&sfEntry))
+        // Make sure entry is file not dir!
+        if (fatfs_entry_is_file(&sfEntry))
+        {
+            // Initialise file details
+            memcpy(file->shortfilename, sfEntry.Name, FAT_SFN_SIZE_FULL);
+            file->filelength = FAT_HTONL(sfEntry.FileSize);
+            file->bytenum = 0;
+            file->startcluster = ((FAT_HTONS((uint32)sfEntry.FstClusHI))<<16) + FAT_HTONS(sfEntry.FstClusLO);
+            file->file_data_address = 0xFFFFFFFF;
+            file->file_data_dirty = 0;
+            file->filelength_changed = 0;
+            
+            // Quick lookup for next link in the chain
+            file->last_fat_lookup.ClusterIdx = 0xFFFFFFFF;
+            file->last_fat_lookup.CurrentCluster = 0xFFFFFFFF;
+            
+//            fatfs_cache_init(&_fs, file);
+            
+            fatfs_fat_purge(&_fs);
+            
+            return file;
+        }
+    
+    _free_file(file);
+    return NULL;
+}
+
+void fatfs_set_fs_info_next_free_cluster(struct fatfs *fs, uint32 newValue)
+{
+    if (fs->fat_type == FAT_TYPE_16)
+        ;
+    else
+    {
+        // Load sector to change it
+        struct fat_buffer *pbuf = fatfs_fat_read_sector(fs, fs->lba_begin+fs->fs_info_sector);
+        if (!pbuf)
+            return ;
+        
+        // Change
+        FAT32_SET_32BIT_WORD(pbuf, 492, newValue);
+        fs->next_free_cluster = newValue;
+        
+        // Write back FSINFO sector to disk
+        if (fs->disk_io.write_media)
+            fs->disk_io.write_media(pbuf->address, pbuf->sector, 1);
+        
+        // Invalidate cache entry
+        pbuf->address = FAT32_INVALID_CLUSTER;
+        pbuf->dirty = 0;
+    }
+}
+
+int fatfs_find_blank_cluster(struct fatfs *fs, uint32 start_cluster, uint32 *free_cluster)
+{
+    uint32 fat_sector_offset, position;
+    uint32 nextcluster;
+    uint32 current_cluster = start_cluster;
+    struct fat_buffer *pbuf;
+    
+    do
+    {
+        // Find which sector of FAT table to read
+        if (fs->fat_type == FAT_TYPE_16)
+            fat_sector_offset = current_cluster / 256;
+        else
+            fat_sector_offset = current_cluster / 128;
+        
+        if ( fat_sector_offset < fs->fat_sectors)
+        {
+            // Read FAT sector into buffer
+            pbuf = fatfs_fat_read_sector(fs, fs->fat_begin_lba+fat_sector_offset);
+            if (!pbuf)
+                return 0;
+            
+            if (fs->fat_type == FAT_TYPE_16)
+            {
+                // Find 32 bit entry of current sector relating to cluster number
+                position = (current_cluster - (fat_sector_offset * 256)) * 2;
+                
+                // Read Next Clusters value from Sector Buffer
+                nextcluster = FAT16_GET_16BIT_WORD(pbuf, (uint16)position);
+            }
+            else
+            {
+                // Find 32 bit entry of current sector relating to cluster number
+                position = (current_cluster - (fat_sector_offset * 128)) * 4;
+                
+                // Read Next Clusters value from Sector Buffer
+                nextcluster = FAT32_GET_32BIT_WORD(pbuf, (uint16)position);
+                
+                // Mask out MS 4 bits (its 28bit addressing)
+                nextcluster = nextcluster & 0x0FFFFFFF;
+            }
+            
+            if (nextcluster !=0 )
+                current_cluster++;
+        }
+        else
+            // Otherwise, run out of FAT sectors to check...
+            return 0;
+    }
+    while (nextcluster != 0x0);
+    
+    // Found blank entry
+    *free_cluster = current_cluster;
+    return 1;
+}
+
+int fatfs_fat_set_cluster(struct fatfs *fs, uint32 cluster, uint32 next_cluster)
+{
+    struct fat_buffer *pbuf;
+    uint32 fat_sector_offset, position;
+    
+    // Find which sector of FAT table to read
+    if (fs->fat_type == FAT_TYPE_16)
+        fat_sector_offset = cluster / 256;
+    else
+        fat_sector_offset = cluster / 128;
+    
+    // Read FAT sector into buffer
+    pbuf = fatfs_fat_read_sector(fs, fs->fat_begin_lba+fat_sector_offset);
+    if (!pbuf)
+        return 0;
+    
+    if (fs->fat_type == FAT_TYPE_16)
+    {
+        // Find 16 bit entry of current sector relating to cluster number
+        position = (cluster - (fat_sector_offset * 256)) * 2;
+        
+        // Write Next Clusters value to Sector Buffer
+        FAT16_SET_16BIT_WORD(pbuf, (uint16)position, ((uint16)next_cluster));
+    }
+    else
+    {
+        // Find 32 bit entry of current sector relating to cluster number
+        position = (cluster - (fat_sector_offset * 128)) * 4;
+        
+        // Write Next Clusters value to Sector Buffer
+        FAT32_SET_32BIT_WORD(pbuf, (uint16)position, next_cluster);
+    }
+    
+    return 1;
+}
+
+int fatfs_add_free_space(struct fatfs *fs, uint32 *startCluster, uint32 clusters)
+{
+    uint32 i;
+    uint32 nextcluster;
+    uint32 start = *startCluster;
+    
+    // Set the next free cluster hint to unknown
+    if (fs->next_free_cluster != FAT32_LAST_CLUSTER)
+        fatfs_set_fs_info_next_free_cluster(fs, FAT32_LAST_CLUSTER);
+    
+    for (i=0;i<clusters;i++)
+    {
+        // Start looking for free clusters from the beginning
+        if (fatfs_find_blank_cluster(fs, fs->rootdir_first_cluster, &nextcluster))
+        {
+            // Point last to this
+            fatfs_fat_set_cluster(fs, start, nextcluster);
+            
+            // Point this to end of file
+            fatfs_fat_set_cluster(fs, nextcluster, FAT32_LAST_CLUSTER);
+            
+            // Adjust argument reference
+            start = nextcluster;
+            if (i == 0)
+                *startCluster = nextcluster;
+        }
+        else
+            return 0;
+    }
+    
+    return 1;
+}
+
+int fatfs_allocate_free_space(struct fatfs *fs, int newFile, uint32 *startCluster, uint32 size)
+{
+    uint32 clusterSize;
+    uint32 clusterCount;
+    uint32 nextcluster;
+    
+    if (size==0)
+        return 0;
+    
+    // Set the next free cluster hint to unknown
+    if (fs->next_free_cluster != FAT32_LAST_CLUSTER)
+        fatfs_set_fs_info_next_free_cluster(fs, FAT32_LAST_CLUSTER);
+    
+    // Work out size and clusters
+    clusterSize = fs->sectors_per_cluster * FAT_SECTOR_SIZE;
+    clusterCount = (size / clusterSize);
+    
+    // If any left over
+    if (size-(clusterSize*clusterCount))
+        clusterCount++;
+    
+    // Allocated first link in the chain if a new file
+    if (newFile)
+    {
+        if (!fatfs_find_blank_cluster(fs, fs->rootdir_first_cluster, &nextcluster))
+            return 0;
+        
+        // If this is all that is needed then all done
+        if (clusterCount==1)
+        {
+            fatfs_fat_set_cluster(fs, nextcluster, FAT32_LAST_CLUSTER);
+            *startCluster = nextcluster;
+            return 1;
+        }
+    }
+    // Allocate from end of current chain (startCluster is end of chain)
+    else
+        nextcluster = *startCluster;
+    
+    if (!fatfs_add_free_space(fs, &nextcluster, clusterCount))
+        return 0;
+    
+    return 1;
+}
+
+int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
+{
+    int i;
+    int dotPos = -1;
+    char ext[3];
+    int pos;
+    int len = (int)strlen(filename);
+    
+    // Invalid to start with .
+    if (filename[0]=='.')
+        return 0;
+    
+    memset(sfn_output, ' ', FAT_SFN_SIZE_FULL);
+    memset(ext, ' ', 3);
+    
+    // Find dot seperator
+    for (i = 0; i< len; i++)
+    {
+        if (filename[i]=='.')
+            dotPos = i;
+    }
+    
+    // Extract extensions
+    if (dotPos!=-1)
+    {
+        // Copy first three chars of extension
+        for (i = (dotPos+1); i < (dotPos+1+3); i++)
+            if (i<len)
+                ext[i-(dotPos+1)] = filename[i];
+        
+        // Shorten the length to the dot position
+        len = dotPos;
+    }
+    
+    // Add filename part
+    pos = 0;
+    for (i=0;i<len;i++)
+    {
+        if ( (filename[i]!=' ') && (filename[i]!='.') )
+        {
+            if (filename[i] >= 'a' && filename[i] <= 'z')
+                sfn_output[pos++] = filename[i] - 'a' + 'A';
+            else
+                sfn_output[pos++] = filename[i];
+        }
+        
+        // Fill upto 8 characters
+        if (pos==FAT_SFN_SIZE_PARTIAL)
+            break;
+    }
+    
+    // Add extension part
+    for (i=FAT_SFN_SIZE_PARTIAL;i<FAT_SFN_SIZE_FULL;i++)
+    {
+        if (ext[i-FAT_SFN_SIZE_PARTIAL] >= 'a' && ext[i-FAT_SFN_SIZE_PARTIAL] <= 'z')
+            sfn_output[i] = ext[i-FAT_SFN_SIZE_PARTIAL] - 'a' + 'A';
+        else
+            sfn_output[i] = ext[i-FAT_SFN_SIZE_PARTIAL];
+    }
+    
+    return 1;
+}
+
+static void fatfs_itoa(uint32 num, char *s)
+{
+    char* cp;
+    char outbuf[12];
+    const char digits[] = "0123456789ABCDEF";
+    
+    // Build string backwards
+    cp = outbuf;
+    do
+    {
+        *cp++ = digits[(int)(num % 10)];
+    }
+    while ((num /= 10) > 0);
+    
+    *cp-- = 0;
+    
+    // Copy in forwards
+    while (cp >= outbuf)
+        *s++ = *cp--;
+    
+    *s = 0;
+}
+
+int fatfs_lfn_generate_tail(char *sfn_output, char *sfn_input, uint32 tailNum)
+{
+    int tail_chars;
+    char tail_str[12];
+    
+    if (tailNum > 99999)
+        return 0;
+    
+    // Convert to number
+    memset(tail_str, 0x00, sizeof(tail_str));
+    tail_str[0] = '~';
+    fatfs_itoa(tailNum, tail_str+1);
+    
+    // Copy in base filename
+    memcpy(sfn_output, sfn_input, FAT_SFN_SIZE_FULL);
+    
+    // Overwrite with tail
+    tail_chars = (int)strlen(tail_str);
+    memcpy(sfn_output+(FAT_SFN_SIZE_PARTIAL-tail_chars), tail_str, tail_chars);
+    
+    return 1;
+}
+
+int fatfs_sfn_exists(struct fatfs *fs, uint32 Cluster, char *shortname)
+{
+    uint8 item=0;
+    uint16 recordoffset = 0;
+    int x=0;
+    struct fat_dir_entry *directoryEntry;
+    
+    // Main cluster following loop
+    while (1)
+    {
+        // Read sector
+        if (fatfs_sector_reader(fs, Cluster, x++, 0)) // If sector read was successfull
+        {
+            // Analyse Sector
+            for (item = 0; item < FAT_DIR_ENTRIES_PER_SECTOR; item++)
+            {
+                // Create the multiplier for sector access
+                recordoffset = FAT_DIR_ENTRY_SIZE * item;
+                
+                // Overlay directory entry over buffer
+                directoryEntry = (struct fat_dir_entry*)(fs->currentsector.sector+recordoffset);
+                
+#if FATFS_INC_LFN_SUPPORT
+                // Long File Name Text Found
+                if (fatfs_entry_lfn_text(directoryEntry) )
+                    ;
+                
+                // If Invalid record found delete any long file name information collated
+                else if (fatfs_entry_lfn_invalid(directoryEntry) )
+                    ;
+                else
+#endif
+                    // Normal Entry, only 8.3 Text
+                    if (fatfs_entry_sfn_only(directoryEntry) )
+                    {
+                        if (strncmp((const char*)directoryEntry->Name, shortname, 11)==0)
+                            return 1;
+                    }
+            } // End of if
+        }
+        else
+            break;
+    } // End of while loop
+    
+    return 0;
+}
+
+int fatfs_free_cluster_chain(struct fatfs *fs, uint32 start_cluster)
+{
+    uint32 last_cluster;
+    uint32 next_cluster = start_cluster;
+    
+    // Loop until end of chain
+    while ( (next_cluster != FAT32_LAST_CLUSTER) && (next_cluster != 0x00000000) )
+    {
+        last_cluster = next_cluster;
+        
+        // Find next link
+        next_cluster = fatfs_find_next_cluster(fs, next_cluster);
+        
+        // Clear last link
+        fatfs_fat_set_cluster(fs, last_cluster, 0x00000000);
+    }
+    
+    return 1;
+}
+
+int fatfs_lfn_entries_required(char *filename)
+{
+    int length = (int)strlen(filename);
+    
+    if (length)
+        return (length + MAX_LFN_ENTRY_LENGTH - 1) / MAX_LFN_ENTRY_LENGTH;
+    else
+        return 0;
+}
+
+int fatfs_fat_add_cluster_to_chain(struct fatfs *fs, uint32 start_cluster, uint32 newEntry)
+{
+    uint32 last_cluster = FAT32_LAST_CLUSTER;
+    uint32 next_cluster = start_cluster;
+    
+    if (start_cluster == FAT32_LAST_CLUSTER)
+        return 0;
+    
+    // Loop until end of chain
+    while ( next_cluster != FAT32_LAST_CLUSTER )
+    {
+        last_cluster = next_cluster;
+        
+        // Find next link
+        next_cluster = fatfs_find_next_cluster(fs, next_cluster);
+        if (!next_cluster)
+            return 0;
+    }
+    
+    // Add link in for new cluster
+    fatfs_fat_set_cluster(fs, last_cluster, newEntry);
+    
+    // Mark new cluster as end of chain
+    fatfs_fat_set_cluster(fs, newEntry, FAT32_LAST_CLUSTER);
+    
+    return 1;
+}
+
+int fatfs_write_sector(struct fatfs *fs, uint32 cluster, uint32 sector, uint8 *target)
+{
+    // No write access?
+    if (!fs->disk_io.write_media)
+        return 0;
+    
+    // FAT16 Root directory
+    if (fs->fat_type == FAT_TYPE_16 && cluster == 0)
+    {
+        uint32 lba;
+        
+        // In FAT16 we cannot extend the root dir!
+        if (sector < fs->rootdir_sectors)
+            lba = fs->lba_begin + fs->rootdir_first_sector + sector;
+        else
+            return 0;
+        
+        // User target buffer passed in
+        if (target)
+        {
+            // Write to disk
+            return fs->disk_io.write_media(lba, target, 1);
+        }
+        else
+        {
+            // Calculate write address
+            fs->currentsector.address = lba;
+            
+            // Write to disk
+            return fs->disk_io.write_media(fs->currentsector.address, fs->currentsector.sector, 1);
+        }
+    }
+    // FAT16/32 Other
+    else
+    {
+        // User target buffer passed in
+        if (target)
+        {
+            // Calculate write address
+            uint32 lba = fatfs_lba_of_cluster(fs, cluster) + sector;
+            
+            // Write to disk
+            return fs->disk_io.write_media(lba, target, 1);
+        }
+        else
+        {
+            // Calculate write address
+            fs->currentsector.address = fatfs_lba_of_cluster(fs, cluster)+sector;
+            
+            // Write to disk
+            return fs->disk_io.write_media(fs->currentsector.address, fs->currentsector.sector, 1);
+        }
+    }
+}
+
+static int fatfs_find_free_dir_offset(struct fatfs *fs, uint32 dirCluster, int entryCount, uint32 *pSector, uint8 *pOffset)
+{
+    struct fat_dir_entry *directoryEntry;
+    uint8 item=0;
+    uint16 recordoffset = 0;
+    uint8 i=0;
+    int x=0;
+    int possible_spaces = 0;
+    int start_recorded = 0;
+    
+    // No entries required?
+    if (entryCount == 0)
+        return 0;
+    
+    // Main cluster following loop
+    while (1)
+    {
+        // Read sector
+        if (fatfs_sector_reader(fs, dirCluster, x++, 0))
+        {
+            // Analyse Sector
+            for (item = 0; item < FAT_DIR_ENTRIES_PER_SECTOR; item++)
+            {
+                // Create the multiplier for sector access
+                recordoffset = FAT_DIR_ENTRY_SIZE * item;
+                
+                // Overlay directory entry over buffer
+                directoryEntry = (struct fat_dir_entry*)(fs->currentsector.sector+recordoffset);
+                
+                // LFN Entry
+                if (fatfs_entry_lfn_text(directoryEntry))
+                {
+                    // First entry?
+                    if (possible_spaces == 0)
+                    {
+                        // Store start
+                        *pSector = x-1;
+                        *pOffset = item;
+                        start_recorded = 1;
+                    }
+                    
+                    // Increment the count in-case the file turns
+                    // out to be deleted...
+                    possible_spaces++;
+                }
+                // SFN Entry
+                else
+                {
+                    // Has file been deleted?
+                    if (fs->currentsector.sector[recordoffset] == FILE_HEADER_DELETED)
+                    {
+                        // First entry?
+                        if (possible_spaces == 0)
+                        {
+                            // Store start
+                            *pSector = x-1;
+                            *pOffset = item;
+                            start_recorded = 1;
+                        }
+                        
+                        possible_spaces++;
+                        
+                        // We have found enough space?
+                        if (possible_spaces >= entryCount)
+                            return 1;
+                        
+                        // Else continue counting until we find a valid entry!
+                    }
+                    // Is the file entry empty?
+                    else if (fs->currentsector.sector[recordoffset] == FILE_HEADER_BLANK)
+                    {
+                        // First entry?
+                        if (possible_spaces == 0)
+                        {
+                            // Store start
+                            *pSector = x-1;
+                            *pOffset = item;
+                            start_recorded = 1;
+                        }
+                        
+                        // Increment the blank entries count
+                        possible_spaces++;
+                        
+                        // We have found enough space?
+                        if (possible_spaces >= entryCount)
+                            return 1;
+                    }
+                    // File entry is valid
+                    else
+                    {
+                        // Reset all flags
+                        possible_spaces = 0;
+                        start_recorded = 0;
+                    }
+                }
+            } // End of for
+        } // End of if
+        // Run out of free space in the directory, allocate some more
+        else
+        {
+            uint32 newCluster;
+            
+            // Get a new cluster for directory
+            if (!fatfs_find_blank_cluster(fs, fs->rootdir_first_cluster, &newCluster))
+                return 0;
+            
+            // Add cluster to end of directory tree
+            if (!fatfs_fat_add_cluster_to_chain(fs, dirCluster, newCluster))
+                return 0;
+            
+            // Erase new directory cluster
+            memset(fs->currentsector.sector, 0x00, FAT_SECTOR_SIZE);
+            for (i=0;i<fs->sectors_per_cluster;i++)
+            {
+                if (!fatfs_write_sector(fs, newCluster, i, 0))
+                    return 0;
+            }
+            
+            // If non of the name fitted on previous sectors
+            if (!start_recorded)
+            {
+                // Store start
+                *pSector = (x-1);
+                *pOffset = 0;
+                start_recorded = 1;
+            }
+            
+            return 1;
+        }
+    } // End of while loop
+    
+    return 0;
+}
+
+void fatfs_sfn_create_entry(char *shortfilename, uint32 size, uint32 startCluster, struct fat_dir_entry *entry, int dir)
+{
+    int i;
+    
+    // Copy short filename
+    for (i=0;i<FAT_SFN_SIZE_FULL;i++)
+        entry->Name[i] = shortfilename[i];
+    
+    // Unless we have a RTC we might as well set these to 1980
+    entry->CrtTimeTenth = 0x00;
+    entry->CrtTime[1] = entry->CrtTime[0] = 0x00;
+    entry->CrtDate[1] = 0x00;
+    entry->CrtDate[0] = 0x20;
+    entry->LstAccDate[1] = 0x00;
+    entry->LstAccDate[0] = 0x20;
+    entry->WrtTime[1] = entry->WrtTime[0] = 0x00;
+    entry->WrtDate[1] = 0x00;
+    entry->WrtDate[0] = 0x20;
+    
+    if (!dir)
+        entry->Attr = FILE_TYPE_FILE;
+    else
+        entry->Attr = FILE_TYPE_DIR;
+    
+    entry->NTRes = 0x00;
+    
+    entry->FstClusHI = FAT_HTONS((uint16)((startCluster>>16) & 0xFFFF));
+    entry->FstClusLO = FAT_HTONS((uint16)((startCluster>>0) & 0xFFFF));
+    entry->FileSize = FAT_HTONL(size);
+}
+
+void fatfs_filename_to_lfn(char *filename, uint8 *buffer, int entry, uint8 sfnChk)
+{
+    int i;
+    int nameIndexes[MAX_LFN_ENTRY_LENGTH] = {1,3,5,7,9,0x0E,0x10,0x12,0x14,0x16,0x18,0x1C,0x1E};
+    
+    // 13 characters entries
+    int length = (int)strlen(filename);
+    int entriesRequired = fatfs_lfn_entries_required(filename);
+    
+    // Filename offset
+    int start = entry * MAX_LFN_ENTRY_LENGTH;
+    
+    // Initialise to zeros
+    memset(buffer, 0x00, FAT_DIR_ENTRY_SIZE);
+    
+    // LFN entry number
+    buffer[0] = (uint8)(((entriesRequired-1)==entry)?(0x40|(entry+1)):(entry+1));
+    
+    // LFN flag
+    buffer[11] = 0x0F;
+    
+    // Checksum of short filename
+    buffer[13] = sfnChk;
+    
+    // Copy to buffer
+    for (i=0;i<MAX_LFN_ENTRY_LENGTH;i++)
+    {
+        if ( (start+i) < length )
+            buffer[nameIndexes[i]] = filename[start+i];
+        else if ( (start+i) == length )
+            buffer[nameIndexes[i]] = 0x00;
+        else
+        {
+            buffer[nameIndexes[i]] = 0xFF;
+            buffer[nameIndexes[i]+1] = 0xFF;
+        }
+    }
+}
+
+int fatfs_add_file_entry(struct fatfs *fs, uint32 dirCluster, char *filename, char *shortfilename, uint32 startCluster, uint32 size, int dir)
+{
+    uint8 item=0;
+    uint16 recordoffset = 0;
+    uint8 i=0;
+    uint32 x=0;
+    int entryCount;
+    struct fat_dir_entry shortEntry;
+    int dirtySector = 0;
+    
+    uint32 dirSector = 0;
+    uint8 dirOffset = 0;
+    int foundEnd = 0;
+    
+    uint8 checksum;
+    uint8 *pSname;
+    
+    // No write access?
+    if (!fs->disk_io.write_media)
+        return 0;
+    
+#if FATFS_INC_LFN_SUPPORT
+    // How many LFN entries are required?
+    // NOTE: We always request one LFN even if it would fit in a SFN!
+    entryCount = fatfs_lfn_entries_required(filename);
+    if (!entryCount)
+        return 0;
+#else
+    entryCount = 0;
+#endif
+    
+    // Find space in the directory for this filename (or allocate some more)
+    // NOTE: We need to find space for at least the LFN + SFN (or just the SFN if LFNs not supported).
+    if (!fatfs_find_free_dir_offset(fs, dirCluster, entryCount + 1, &dirSector, &dirOffset))
+        return 0;
+    
+    // Generate checksum of short filename
+    pSname = (uint8*)shortfilename;
+    checksum = 0;
+    for (i=11; i!=0; i--) checksum = ((checksum & 1) ? 0x80 : 0) + (checksum >> 1) + *pSname++;
+    
+    // Start from current sector where space was found!
+    x = dirSector;
+    
+    // Main cluster following loop
+    while (1)
+    {
+        // Read sector
+        if (fatfs_sector_reader(fs, dirCluster, x++, 0))
+        {
+            // Analyse Sector
+            for (item = 0; item < FAT_DIR_ENTRIES_PER_SECTOR; item++)
+            {
+                // Create the multiplier for sector access
+                recordoffset = FAT_DIR_ENTRY_SIZE * item;
+                
+                // If the start position for the entry has been found
+                if (foundEnd==0)
+                    if ( (dirSector==(x-1)) && (dirOffset==item) )
+                        foundEnd = 1;
+                
+                // Start adding filename
+                if (foundEnd)
+                {
+                    if (entryCount==0)
+                    {
+                        // Short filename
+                        fatfs_sfn_create_entry(shortfilename, size, startCluster, &shortEntry, dir);
+                        
+#if FATFS_INC_TIME_DATE_SUPPORT
+                        // Update create, access & modify time & date
+                        fatfs_update_timestamps(&shortEntry, 1, 1, 1);
+#endif
+                        
+                        memcpy(&fs->currentsector.sector[recordoffset], &shortEntry, sizeof(shortEntry));
+                        
+                        // Writeback
+                        return fs->disk_io.write_media(fs->currentsector.address, fs->currentsector.sector, 1);
+                    }
+#if FATFS_INC_LFN_SUPPORT
+                    else
+                    {
+                        entryCount--;
+                        
+                        // Copy entry to directory buffer
+                        fatfs_filename_to_lfn(filename, &fs->currentsector.sector[recordoffset], entryCount, checksum);
+                        dirtySector = 1;
+                    }
+#endif
+                }
+            } // End of if
+            
+            // Write back to disk before loading another sector
+            if (dirtySector)
+            {
+                if (!fs->disk_io.write_media(fs->currentsector.address, fs->currentsector.sector, 1))
+                    return 0;
+                
+                dirtySector = 0;
+            }
+        }
+        else
+            return 0;
+    } // End of while loop
+    
+    return 0;
+}
+
+static FL_FILE* _create_file(const char *filename)
+{
+    FL_FILE* file;
+    struct fat_dir_entry sfEntry;
+    char shortFilename[FAT_SFN_SIZE_FULL];
+    int tailNum = 0;
+    
+    // No write access?
+    if (!_fs.disk_io.write_media)
+        return NULL;
+    
+    // Allocate a new file handle
+    file = _allocate_file();
+    if (!file)
+        return NULL;
+    
+    // Clear filename
+    memset(file->path, '\0', sizeof(file->path));
+    memset(file->filename, '\0', sizeof(file->filename));
+    
+    // Split full path into filename and directory path
+    if (fatfs_split_path((char*)filename, file->path, sizeof(file->path), file->filename, sizeof(file->filename)) == -1)
+    {
+        _free_file(file);
+        return NULL;
+    }
+    
+    // Check if file already open
+    if (_check_file_open(file))
+    {
+        _free_file(file);
+        return NULL;
+    }
+    
+    // If file is in the root dir
+    if (file->path[0] == 0)
+        file->parentcluster = fatfs_get_root_cluster(&_fs);
+    else
+    {
+        // Find parent directory start cluster
+        if (!_open_directory(file->path, &file->parentcluster))
+        {
+            _free_file(file);
+            return NULL;
+        }
+    }
+    
+    // Check if same filename exists in directory
+    if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename,&sfEntry) == 1)
+    {
+        _free_file(file);
+        return NULL;
+    }
+    
+    file->startcluster = 0;
+    
+    // Create the file space for the file (at least one clusters worth!)
+    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, 1))
+    {
+        _free_file(file);
+        return NULL;
+    }
+    
+#if FATFS_INC_LFN_SUPPORT
+    // Generate a short filename & tail
+    tailNum = 0;
+    do
+    {
+        // Create a standard short filename (without tail)
+        fatfs_lfn_create_sfn(shortFilename, file->filename);
+        
+        // If second hit or more, generate a ~n tail
+        if (tailNum != 0)
+            fatfs_lfn_generate_tail((char*)file->shortfilename, shortFilename, tailNum);
+        // Try with no tail if first entry
+        else
+            memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
+        
+        // Check if entry exists already or not
+        if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename) == 0)
+            break;
+        
+        tailNum++;
+    }
+    while (tailNum < 9999);
+    
+    // We reached the max number of duplicate short file names (unlikely!)
+    if (tailNum == 9999)
+    {
+        // Delete allocated space
+        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        
+        _free_file(file);
+        return NULL;
+    }
+#else
+    // Create a standard short filename (without tail)
+    if (!fatfs_lfn_create_sfn(shortFilename, file->filename))
+    {
+        // Delete allocated space
+        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        
+        _free_file(file);
+        return NULL;
+    }
+    
+    // Copy to SFN space
+    memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
+    
+    // Check if entry exists already
+    if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename))
+    {
+        // Delete allocated space
+        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        
+        _free_file(file);
+        return NULL;
+    }
+#endif
+    
+    // Add file to disk
+    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, 0, 0))
+    {
+        // Delete allocated space
+        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        
+        _free_file(file);
+        return NULL;
+    }
+    
+    // General
+    file->filelength = 0;
+    file->bytenum = 0;
+    file->file_data_address = 0xFFFFFFFF;
+    file->file_data_dirty = 0;
+    file->filelength_changed = 0;
+    
+    // Quick lookup for next link in the chain
+    file->last_fat_lookup.ClusterIdx = 0xFFFFFFFF;
+    file->last_fat_lookup.CurrentCluster = 0xFFFFFFFF;
+    
+//    fatfs_cache_init(&_fs, file);
+    
+    fatfs_fat_purge(&_fs);
+    
+    return file;
+}
+
+void* fl_fopen(const char *path, const char *mode)
+{
+    int i;
+    FL_FILE* file;
+    uint8 flags = 0;
+    
+    if (!_filelib_valid)
+        return NULL;
+    
+    if (!path || !mode)
+        return NULL;
+    
+    // Supported Modes:
+    // "r" Open a file for reading.
+    //        The file must exist.
+    // "w" Create an empty file for writing.
+    //        If a file with the same name already exists its content is erased and the file is treated as a new empty file.
+    // "a" Append to a file.
+    //        Writing operations append data at the end of the file.
+    //        The file is created if it does not exist.
+    // "r+" Open a file for update both reading and writing.
+    //        The file must exist.
+    // "w+" Create an empty file for both reading and writing.
+    //        If a file with the same name already exists its content is erased and the file is treated as a new empty file.
+    // "a+" Open a file for reading and appending.
+    //        All writing operations are performed at the end of the file, protecting the previous content to be overwritten.
+    //        You can reposition (fseek, rewind) the internal pointer to anywhere in the file for reading, but writing operations
+    //        will move it back to the end of file.
+    //        The file is created if it does not exist.
+    
+    for (i=0;i<(int)strlen(mode);i++)
+    {
+        switch (mode[i])
+        {
+            case 'r':
+            case 'R':
+                flags |= FILE_READ;
+                break;
+            case 'w':
+            case 'W':
+                flags |= FILE_WRITE;
+                flags |= FILE_ERASE;
+                flags |= FILE_CREATE;
+                break;
+            case 'a':
+            case 'A':
+                flags |= FILE_WRITE;
+                flags |= FILE_APPEND;
+                flags |= FILE_CREATE;
+                break;
+            case '+':
+                if (flags & FILE_READ)
+                    flags |= FILE_WRITE;
+                else if (flags & FILE_WRITE)
+                {
+                    flags |= FILE_READ;
+                    flags |= FILE_ERASE;
+                    flags |= FILE_CREATE;
+                }
+                else if (flags & FILE_APPEND)
+                {
+                    flags |= FILE_READ;
+                    flags |= FILE_WRITE;
+                    flags |= FILE_APPEND;
+                    flags |= FILE_CREATE;
+                }
+                break;
+            case 'b':
+            case 'B':
+                flags |= FILE_BINARY;
+                break;
+        }
+    }
+    
+    file = NULL;
+    
+#if FATFS_INC_WRITE_SUPPORT == 0
+    // No write support!
+    flags &= ~(FILE_CREATE | FILE_WRITE | FILE_APPEND);
+#endif
+    
+    // No write access - remove write/modify flags
+    if (!_fs.disk_io.write_media)
+        flags &= ~(FILE_CREATE | FILE_WRITE | FILE_APPEND);
+    
+    FL_LOCK(&_fs);
+    
+    // Read
+    if (flags & FILE_READ)
+        file = _open_file(path);
+    
+    // Create New
+#if FATFS_INC_WRITE_SUPPORT
+    if (!file && (flags & FILE_CREATE))
+        file = _create_file(path);
+#endif
+    
+    // Write Existing (and not open due to read or create)
+    if (!(flags & FILE_READ))
+        if ((flags & FILE_CREATE) && !file)
+            if (flags & (FILE_WRITE | FILE_APPEND))
+                file = _open_file(path);
+    
+    if (file)
+        file->flags = flags;
+    
+    FL_UNLOCK(&_fs);
+    return file;
+}
+
 #endif /* header_h */

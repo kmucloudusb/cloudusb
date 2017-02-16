@@ -31,6 +31,8 @@ int main(int argc, char *argv[])
     
     fl_listdirectory("/");
     
+    file = fl_fopen("/DDong.txt", "w");
+    
     media_close();
 }
 
