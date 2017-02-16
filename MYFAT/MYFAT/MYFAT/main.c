@@ -29,9 +29,20 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    fl_listdirectory("/");
+    file = fl_fopen("/Dongle.txt", "w");
+    if (file)
+    {
+        // Write some data
+        unsigned char data[] = { 1, 2, 3, 4, 5};
+        if (fl_fwrite(data, 1, sizeof(data), file) != sizeof(data))
+            printf("ERROR: Write file failed\n");
+    }
+    else
+        printf("ERROR: Create file failed\n");
     
-    file = fl_fopen("/DDong.txt", "w");
+    fl_fclose(file);
+    
+    fl_listdirectory("/");
     
     media_close();
 }

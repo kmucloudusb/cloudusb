@@ -2364,4 +2364,484 @@ void* fl_fopen(const char *path, const char *mode)
     return file;
 }
 
+
+
+//
+//
+// fl_fwrite
+
+int fatfs_cache_get_next_cluster(struct fatfs *fs, FL_FILE *file, uint32 clusterIdx, uint32 *pNextCluster)
+{
+#ifdef FAT_CLUSTER_CACHE_ENTRIES
+    uint32 slot = clusterIdx % FAT_CLUSTER_CACHE_ENTRIES;
+    
+    if (file->cluster_cache_idx[slot] == clusterIdx)
+    {
+        *pNextCluster = file->cluster_cache_data[slot];
+        return 1;
+    }
+#endif
+    
+    return 0;
+}
+
+int fatfs_cache_set_next_cluster(struct fatfs *fs, FL_FILE *file, uint32 clusterIdx, uint32 nextCluster)
+{
+#ifdef FAT_CLUSTER_CACHE_ENTRIES
+    uint32 slot = clusterIdx % FAT_CLUSTER_CACHE_ENTRIES;
+    
+    if (file->cluster_cache_idx[slot] == clusterIdx)
+        file->cluster_cache_data[slot] = nextCluster;
+    else
+    {
+        file->cluster_cache_idx[slot] = clusterIdx;
+        file->cluster_cache_data[slot] = nextCluster;
+    }
+#endif
+    
+    return 1;
+}
+
+int fatfs_sector_write(struct fatfs *fs, uint32 lba, uint8 *target, uint32 count)
+{
+    return fs->disk_io.write_media(lba, target, count);
+}
+
+static uint32 _write_sectors(FL_FILE* file, uint32 offset, uint8 *buf, uint32 count)
+{
+    uint32 SectorNumber = 0;
+    uint32 ClusterIdx = 0;
+    uint32 Cluster = 0;
+    uint32 LastCluster = FAT32_LAST_CLUSTER;
+    uint32 i;
+    uint32 lba;
+    uint32 TotalWriteCount = count;
+    
+    // Find values for Cluster index & sector within cluster
+    ClusterIdx = offset / _fs.sectors_per_cluster;
+    SectorNumber = offset - (ClusterIdx * _fs.sectors_per_cluster);
+    
+    // Limit number of sectors written to the number remaining in this cluster
+    if ((SectorNumber + count) > _fs.sectors_per_cluster)
+        count = _fs.sectors_per_cluster - SectorNumber;
+    
+    // Quick lookup for next link in the chain
+    if (ClusterIdx == file->last_fat_lookup.ClusterIdx)
+        Cluster = file->last_fat_lookup.CurrentCluster;
+    // Else walk the chain
+    else
+    {
+        // Starting from last recorded cluster?
+        if (ClusterIdx && ClusterIdx == file->last_fat_lookup.ClusterIdx + 1)
+        {
+            i = file->last_fat_lookup.ClusterIdx;
+            Cluster = file->last_fat_lookup.CurrentCluster;
+        }
+        // Start searching from the beginning..
+        else
+        {
+            // Set start of cluster chain to initial value
+            i = 0;
+            Cluster = file->startcluster;
+        }
+        
+        // Follow chain to find cluster to read
+        for ( ;i<ClusterIdx; i++)
+        {
+            uint32 nextCluster;
+            
+            // Does the entry exist in the cache?
+            if (!fatfs_cache_get_next_cluster(&_fs, file, i, &nextCluster))
+            {
+                // Scan file linked list to find next entry
+                nextCluster = fatfs_find_next_cluster(&_fs, Cluster);
+                
+                // Push entry into cache
+                fatfs_cache_set_next_cluster(&_fs, file, i, nextCluster);
+            }
+            
+            LastCluster = Cluster;
+            Cluster = nextCluster;
+            
+            // Dont keep following a dead end
+            if (Cluster == FAT32_LAST_CLUSTER)
+                break;
+        }
+        
+        // If we have reached the end of the chain, allocate more!
+        if (Cluster == FAT32_LAST_CLUSTER)
+        {
+            // Add some more cluster(s) to the last good cluster chain
+            if (!fatfs_add_free_space(&_fs, &LastCluster,  (TotalWriteCount + _fs.sectors_per_cluster -1) / _fs.sectors_per_cluster))
+                return 0;
+            
+            Cluster = LastCluster;
+        }
+        
+        // Record current cluster lookup details
+        file->last_fat_lookup.CurrentCluster = Cluster;
+        file->last_fat_lookup.ClusterIdx = ClusterIdx;
+    }
+    
+    // Calculate write address
+    lba = fatfs_lba_of_cluster(&_fs, Cluster) + SectorNumber;
+    
+    if (fatfs_sector_write(&_fs, lba, buf, count))
+        return count;
+    else
+        return 0;
+}
+
+int fl_fflush(void *f)
+{
+#if FATFS_INC_WRITE_SUPPORT
+    FL_FILE *file = (FL_FILE *)f;
+    
+    if (file)
+    {
+        FL_LOCK(&_fs);
+        
+        // If some write data still in buffer
+        if (file->file_data_dirty)
+        {
+            // Write back current sector before loading next
+            if (_write_sectors(file, file->file_data_address, file->file_data_sector, 1))
+                file->file_data_dirty = 0;
+        }
+        
+        FL_UNLOCK(&_fs);
+    }
+#endif
+    return 0;
+}
+
+int fatfs_sector_read(struct fatfs *fs, uint32 lba, uint8 *target, uint32 count)
+{
+    return fs->disk_io.read_media(lba, target, count);
+}
+
+static uint32 _read_sectors(FL_FILE* file, uint32 offset, uint8 *buffer, uint32 count)
+{
+    uint32 Sector = 0;
+    uint32 ClusterIdx = 0;
+    uint32 Cluster = 0;
+    uint32 i;
+    uint32 lba;
+    
+    // Find cluster index within file & sector with cluster
+    ClusterIdx = offset / _fs.sectors_per_cluster;
+    Sector = offset - (ClusterIdx * _fs.sectors_per_cluster);
+    
+    // Limit number of sectors read to the number remaining in this cluster
+    if ((Sector + count) > _fs.sectors_per_cluster)
+        count = _fs.sectors_per_cluster - Sector;
+    
+    // Quick lookup for next link in the chain
+    if (ClusterIdx == file->last_fat_lookup.ClusterIdx)
+        Cluster = file->last_fat_lookup.CurrentCluster;
+    // Else walk the chain
+    else
+    {
+        // Starting from last recorded cluster?
+        if (ClusterIdx && ClusterIdx == file->last_fat_lookup.ClusterIdx + 1)
+        {
+            i = file->last_fat_lookup.ClusterIdx;
+            Cluster = file->last_fat_lookup.CurrentCluster;
+        }
+        // Start searching from the beginning..
+        else
+        {
+            // Set start of cluster chain to initial value
+            i = 0;
+            Cluster = file->startcluster;
+        }
+        
+        // Follow chain to find cluster to read
+        for ( ;i<ClusterIdx; i++)
+        {
+            uint32 nextCluster;
+            
+            // Does the entry exist in the cache?
+            if (!fatfs_cache_get_next_cluster(&_fs, file, i, &nextCluster))
+            {
+                // Scan file linked list to find next entry
+                nextCluster = fatfs_find_next_cluster(&_fs, Cluster);
+                
+                // Push entry into cache
+                fatfs_cache_set_next_cluster(&_fs, file, i, nextCluster);
+            }
+            
+            Cluster = nextCluster;
+        }
+        
+        // Record current cluster lookup details (if valid)
+        if (Cluster != FAT32_LAST_CLUSTER)
+        {
+            file->last_fat_lookup.CurrentCluster = Cluster;
+            file->last_fat_lookup.ClusterIdx = ClusterIdx;
+        }
+    }
+    
+    // If end of cluster chain then return false
+    if (Cluster == FAT32_LAST_CLUSTER)
+        return 0;
+    
+    // Calculate sector address
+    lba = fatfs_lba_of_cluster(&_fs, Cluster) + Sector;
+    
+    // Read sector of file
+    if (fatfs_sector_read(&_fs, lba, buffer, count))
+        return count;
+    else
+        return 0;
+}
+
+int fl_fwrite(const void * data, int size, int count, void *f )
+{
+    FL_FILE *file = (FL_FILE *)f;
+    uint32 sector;
+    uint32 offset;
+    uint32 length = (size*count);
+    uint8 *buffer = (uint8 *)data;
+    uint32 bytesWritten = 0;
+    uint32 copyCount;
+    
+    if (!file)
+        return -1;
+    
+    FL_LOCK(&_fs);
+    
+    // No write permissions
+    if (!(file->flags & FILE_WRITE))
+    {
+        FL_UNLOCK(&_fs);
+        return -1;
+    }
+    
+    // Append writes to end of file
+    if (file->flags & FILE_APPEND)
+        file->bytenum = file->filelength;
+    // Else write to current position
+    
+    // Calculate start sector
+    sector = file->bytenum / FAT_SECTOR_SIZE;
+    
+    // Offset to start copying data from first sector
+    offset = file->bytenum % FAT_SECTOR_SIZE;
+    
+    while (bytesWritten < length)
+    {
+        // Whole sector or more to be written?
+        if ((offset == 0) && ((length - bytesWritten) >= FAT_SECTOR_SIZE))
+        {
+            uint32 sectorsWrote;
+            
+            // Buffered sector, flush back to disk
+            if (file->file_data_address != 0xFFFFFFFF)
+            {
+                // Flush un-written data to file
+                if (file->file_data_dirty)
+                    fl_fflush(file);
+                
+                file->file_data_address = 0xFFFFFFFF;
+                file->file_data_dirty = 0;
+            }
+            
+            // Write as many sectors as possible
+            sectorsWrote = _write_sectors(file, sector, (uint8*)(buffer + bytesWritten), (length - bytesWritten) / FAT_SECTOR_SIZE);
+            copyCount = FAT_SECTOR_SIZE * sectorsWrote;
+            
+            // Increase total read count
+            bytesWritten += copyCount;
+            
+            // Increment file pointer
+            file->bytenum += copyCount;
+            
+            // Move onto next sector and reset copy offset
+            sector+= sectorsWrote;
+            offset = 0;
+            
+            if (!sectorsWrote)
+                break;
+        }
+        else
+        {
+            // We have upto one sector to copy
+            copyCount = FAT_SECTOR_SIZE - offset;
+            
+            // Only require some of this sector?
+            if (copyCount > (length - bytesWritten))
+                copyCount = (length - bytesWritten);
+            
+            // Do we need to read a new sector?
+            if (file->file_data_address != sector)
+            {
+                // Flush un-written data to file
+                if (file->file_data_dirty)
+                    fl_fflush(file);
+                
+                // If we plan to overwrite the whole sector, we don't need to read it first!
+                if (copyCount != FAT_SECTOR_SIZE)
+                {
+                    // NOTE: This does not have succeed; if last sector of file
+                    // reached, no valid data will be read in, but write will
+                    // allocate some more space for new data.
+                    
+                    // Get LBA of sector offset within file
+                    if (!_read_sectors(file, sector, file->file_data_sector, 1))
+                        memset(file->file_data_sector, 0x00, FAT_SECTOR_SIZE);
+                }
+                
+                file->file_data_address = sector;
+                file->file_data_dirty = 0;
+            }
+            
+            // Copy from application buffer into sector buffer
+            memcpy((uint8*)(file->file_data_sector + offset), (uint8*)(buffer + bytesWritten), copyCount);
+            
+            // Mark buffer as dirty
+            file->file_data_dirty = 1;
+            
+            // Increase total read count
+            bytesWritten += copyCount;
+            
+            // Increment file pointer
+            file->bytenum += copyCount;
+            
+            // Move onto next sector and reset copy offset
+            sector++;
+            offset = 0;
+        }
+    }
+    
+    // Write increased extent of the file?
+    if (file->bytenum > file->filelength)
+    {
+        // Increase file size to new point
+        file->filelength = file->bytenum;
+        
+        // We are changing the file length and this
+        // will need to be writen back at some point
+        file->filelength_changed = 1;
+    }
+    
+#if FATFS_INC_TIME_DATE_SUPPORT
+    // If time & date support is enabled, always force directory entry to be
+    // written in-order to update file modify / access time & date.
+    file->filelength_changed = 1;
+#endif
+    
+    FL_UNLOCK(&_fs);
+    
+    return (size*count);
+}
+
+
+
+//
+//
+// fl_fclose
+
+int fatfs_update_file_length(struct fatfs *fs, uint32 Cluster, char *shortname, uint32 fileLength)
+{
+    uint8 item=0;
+    uint16 recordoffset = 0;
+    int x=0;
+    struct fat_dir_entry *directoryEntry;
+    
+    // No write access?
+    if (!fs->disk_io.write_media)
+        return 0;
+    
+    // Main cluster following loop
+    while (1)
+    {
+        // Read sector
+        if (fatfs_sector_reader(fs, Cluster, x++, 0)) // If sector read was successfull
+        {
+            // Analyse Sector
+            for (item = 0; item < FAT_DIR_ENTRIES_PER_SECTOR; item++)
+            {
+                // Create the multiplier for sector access
+                recordoffset = FAT_DIR_ENTRY_SIZE * item;
+                
+                // Overlay directory entry over buffer
+                directoryEntry = (struct fat_dir_entry*)(fs->currentsector.sector+recordoffset);
+                
+#if FATFS_INC_LFN_SUPPORT
+                // Long File Name Text Found
+                if (fatfs_entry_lfn_text(directoryEntry) )
+                    ;
+                
+                // If Invalid record found delete any long file name information collated
+                else if (fatfs_entry_lfn_invalid(directoryEntry) )
+                    ;
+                
+                // Normal Entry, only 8.3 Text
+                else
+#endif
+                    if (fatfs_entry_sfn_only(directoryEntry) )
+                    {
+                        if (strncmp((const char*)directoryEntry->Name, shortname, 11)==0)
+                        {
+                            directoryEntry->FileSize = FAT_HTONL(fileLength);
+                            
+#if FATFS_INC_TIME_DATE_SUPPORT
+                            // Update access / modify time & date
+                            fatfs_update_timestamps(directoryEntry, 0, 1, 1);
+#endif
+                            
+                            // Update sfn entry
+                            memcpy((uint8*)(fs->currentsector.sector+recordoffset), (uint8*)directoryEntry, sizeof(struct fat_dir_entry));
+                            
+                            // Write sector back
+                            return fs->disk_io.write_media(fs->currentsector.address, fs->currentsector.sector, 1);
+                        }
+                    }
+            } // End of if
+        }
+        else
+            break;
+    } // End of while loop
+    
+    return 0;
+}
+
+void fl_fclose(void *f)
+{
+    FL_FILE *file = (FL_FILE *)f;
+    
+    if (file)
+    {
+        FL_LOCK(&_fs);
+        
+        // Flush un-written data to file
+        fl_fflush(f);
+        
+        // File size changed?
+        if (file->filelength_changed)
+        {
+#if FATFS_INC_WRITE_SUPPORT
+            // Update filesize in directory
+            fatfs_update_file_length(&_fs, file->parentcluster, (char*)file->shortfilename, file->filelength);
+#endif
+            file->filelength_changed = 0;
+        }
+        
+        file->bytenum = 0;
+        file->filelength = 0;
+        file->startcluster = 0;
+        file->file_data_address = 0xFFFFFFFF;
+        file->file_data_dirty = 0;
+        file->filelength_changed = 0;
+        
+        // Free file handle
+        _free_file(file);
+        
+        fatfs_fat_purge(&_fs);
+        
+        FL_UNLOCK(&_fs);
+    }
+}
+
 #endif /* header_h */
