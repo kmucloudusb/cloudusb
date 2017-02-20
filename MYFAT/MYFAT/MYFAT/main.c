@@ -11,10 +11,10 @@ int media_read(unsigned long sector, unsigned char *buffer, unsigned long sector
 int media_write(unsigned long sector, unsigned char *buffer, unsigned long sector_count);
 void media_close();
 
+int read_write_entry(void);
+
 int main(int argc, char *argv[])
 {
-    FL_FILE *file;
-
     if (media_init("/Users/lunahc92/Desktop/test.dmg") != 1)
     {
         puts("media_init error");
@@ -29,21 +29,10 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    file = fl_fopen("/Dongle.txt", "w");
-    if (file)
-    {
-        // Write some data
-        unsigned char data[] = { 1, 2, 3, 4, 5};
-        if (fl_fwrite(data, 1, sizeof(data), file) != sizeof(data))
-            printf("ERROR: Write file failed\n");
-    }
-    else
-        printf("ERROR: Create file failed\n");
-    
-    fl_fclose(file);
+    read_write_entry();
     
     fl_listdirectory("/");
-    
+
     media_close();
 }
 
@@ -109,4 +98,33 @@ int media_write(unsigned long sector, unsigned char *buffer, unsigned long secto
 void media_close(){
     close(out_file);
     close(in_file);
+}
+
+int read_write_entry(void)
+{
+    // need to read from google drive
+    FILE *fp = fopen("/Users/lunahc92/Desktop/list.txt", "r");
+    /*
+     list.txt <filename> <filesize>
+     ex)
+     /tx1.txt 100
+     /tx2.txt 300
+     /bi1.bin 200
+     /bi2.bin 400
+     */
+    
+    int ret;
+    int count = 0;
+    uint32 fsize;
+    char filename[FAT_SFN_SIZE_FULL];
+    
+    do
+    {
+        count ++;
+        ret = fscanf(fp, "%s %ud", filename, &fsize);
+        func(filename, fsize);
+    }
+    while(ret != -1);
+    
+    return count;
 }

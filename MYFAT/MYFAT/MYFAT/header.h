@@ -2844,4 +2844,101 @@ void fl_fclose(void *f)
     }
 }
 
+//
+// my func
+// make file from D-drive file list
+
+void func(char *file_name, uint32 file_size_byte) {
+    FL_FILE* file;
+    struct fat_dir_entry sfEntry;
+    char shortFilename[FAT_SFN_SIZE_FULL];
+    
+    uint32 sector = 0;
+    uint32 offset = 0;
+    uint32 length = file_size_byte;
+    uint32 bytesWritten = 0;
+    uint32 copyCount;
+    
+    file = _allocate_file();
+    
+    memset(file->path, '\0', sizeof(file->path));
+    memset(file->filename, '\0', sizeof(file->filename));
+    
+    fatfs_split_path((char*)file_name, file->path, sizeof(file->path), file->filename, sizeof(file->filename));
+    
+    file->parentcluster = fatfs_get_root_cluster(&_fs);
+    
+    // need?
+    if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename, &sfEntry) == 1)
+    {
+        _free_file(file);
+        return ;
+    }
+    
+    // need?
+    file->startcluster = 0;
+    
+    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, 1))
+    {
+        _free_file(file);
+        return ;
+    }
+    
+    // only short file
+    fatfs_lfn_create_sfn(shortFilename, file->filename);
+    memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
+    
+    if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename))
+    {
+        // Delete allocated space
+        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        
+        _free_file(file);
+        return ;
+    }
+    
+    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, 0, 0))
+    {
+        // Delete allocated space
+        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        
+        _free_file(file);
+        return ;
+    }
+    
+    file->filelength = 0;
+    file->bytenum = 0;
+    file->file_data_address = 0xFFFFFFFF;
+    file->file_data_dirty = 0;
+    file->filelength_changed = 0;
+    
+    file->last_fat_lookup.ClusterIdx = 0xFFFFFFFF;
+    file->last_fat_lookup.CurrentCluster = 0xFFFFFFFF;
+    
+    fatfs_fat_purge(&_fs);
+    
+    _read_sectors(file, sector, file->file_data_sector, 1);
+    
+    file->file_data_address = sector;
+    
+    copyCount = FAT_SECTOR_SIZE - offset;
+    
+    // Only require some of this sector?
+    if (copyCount > (length - bytesWritten))
+        copyCount = (length - bytesWritten);
+    
+//    memcpy((uint8*)(file->file_data_sector + offset), (uint8*)(data + bytesWritten), copyCount);
+    
+    file->file_data_dirty = 1;
+    
+    bytesWritten += copyCount;
+    
+    file->bytenum += copyCount;
+    
+    file->filelength = file->bytenum;
+    file->filelength_changed = 1;
+    
+    fl_fclose(file);
+}
+
 #endif /* header_h */
