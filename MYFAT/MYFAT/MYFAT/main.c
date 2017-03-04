@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "header.h"
 
 int in_file;
@@ -12,6 +13,8 @@ int media_write(unsigned long sector, unsigned char *buffer, unsigned long secto
 void media_close();
 
 int read_write_entry(void);
+
+void read_pipe(char *pipe_path);
 
 int main(int argc, char *argv[])
 {
@@ -127,4 +130,17 @@ int read_write_entry(void)
     while(ret != -1);
     
     return count;
+}
+
+void read_pipe(char *pipe_path)
+{
+#define MAX_BUF 1024
+    
+    int fd;
+    char buf[MAX_BUF];
+    
+    fd = open(pipe_path, O_RDONLY);
+    read(fd, buf, MAX_BUF);
+    printf("Received: %s\n", buf);
+    close(fd);
 }
