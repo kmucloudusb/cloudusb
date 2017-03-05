@@ -12,9 +12,8 @@ int media_read(unsigned long sector, unsigned char *buffer, unsigned long sector
 int media_write(unsigned long sector, unsigned char *buffer, unsigned long sector_count);
 void media_close();
 
-int read_write_entry(void);
-
-void read_pipe(char *pipe_path);
+int read_entry_from_pipe(char *pipe_path);
+void read_pipe(char *pipe_path, char *buf);
 
 int main(int argc, char *argv[])
 {
@@ -32,7 +31,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    read_write_entry();
+    read_entry_from_pipe("/Users/lunahc92/Desktop/ff");
     
     fl_listdirectory("/");
 
@@ -103,44 +102,43 @@ void media_close(){
     close(in_file);
 }
 
-int read_write_entry(void)
+int read_entry_from_pipe(char *pipe_path)
 {
-    // need to read from google drive
-    FILE *fp = fopen("/Users/lunahc92/Desktop/list.txt", "r");
-    /*
-     list.txt <filename> <filesize>
-     ex)
-     /tx1.txt 100
-     /tx2.txt 300
-     /bi1.bin 200
-     /bi2.bin 400
-     */
+#define MAX_BUF 1024
+    char buf[MAX_BUF];
+    
+    // read from pipe
+    read_pipe(pipe_path, buf);
     
     int ret;
     int count = 0;
+    int loc_buf_point = 0;
     uint32 fsize;
+    char ch;
     char filename[FAT_SFN_SIZE_FULL];
     
-    do
+    while(1)
     {
-        count ++;
-        ret = fscanf(fp, "%s %ud", filename, &fsize);
+        count++;
+        ret = sscanf(buf+loc_buf_point, "%s %u", filename, &fsize);
         func(filename, fsize);
+        
+        while((ch = *(buf+(loc_buf_point++))) != '\n' && ch != EOF)
+            ++loc_buf_point;
+        
+        if(ch == EOF)
+            break;
     }
-    while(ret != -1);
     
     return count;
 }
 
-void read_pipe(char *pipe_path)
+void read_pipe(char *pipe_path, char *buf)
 {
-#define MAX_BUF 1024
-    
     int fd;
-    char buf[MAX_BUF];
     
     fd = open(pipe_path, O_RDONLY);
     read(fd, buf, MAX_BUF);
-    printf("Received: %s\n", buf);
+    
     close(fd);
 }
