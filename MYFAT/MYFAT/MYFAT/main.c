@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -37,7 +38,7 @@ int main(int argc, char *argv[])
     
     read_entry_from_pipe(PIPE_PATH);
     
-    fl_listdirectory("/");
+//    fl_listdirectory("/");
 
     media_close();
 }
@@ -132,9 +133,9 @@ int read_entry_from_pipe(char *pipe_path)
         ret = sscanf(buf+loc_buf_point, "%s %u", filename, &fsize);
         func(filename, fsize);
         
-        while((ch = *(buf+(loc_buf_point++))) != '\n' && ch != EOF);
+        while((ch = *(buf+(loc_buf_point++))) != '\n' && ch != '\0');
         
-        if(ch == EOF)
+        if(ch == '\0')
             break;
     }
     
