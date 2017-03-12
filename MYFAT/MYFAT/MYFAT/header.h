@@ -2849,6 +2849,7 @@ void fl_fclose(void *f)
 // make file from D-drive file list
 
 void func(char *file_name, uint32 file_size_byte) {
+    printf("<%s>\n", file_name);
     FL_FILE* file;
     struct fat_dir_entry sfEntry;
     char shortFilename[FAT_SFN_SIZE_FULL];

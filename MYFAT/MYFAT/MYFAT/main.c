@@ -4,6 +4,10 @@
 #include <sys/stat.h>
 #include "header.h"
 
+#define SCRIPT_PATH "/Users/lunahc92/Desktop/newFAT32/googledrive/list.py"
+#define IMAGE_PATH "/Users/lunahc92/Desktop/test.dmg"
+#define PIPE_PATH "/Users/lunahc92/Desktop/myfifo"
+
 int in_file;
 int out_file;
 
@@ -17,7 +21,7 @@ void read_pipe(char *pipe_path, char *buf);
 
 int main(int argc, char *argv[])
 {
-    if (media_init("/Users/lunahc92/Desktop/test.dmg") != 1)
+    if (media_init(IMAGE_PATH) != 1)
     {
         puts("media_init error");
         return -1;
@@ -31,7 +35,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    read_entry_from_pipe("/Users/lunahc92/Desktop/ff");
+    read_entry_from_pipe(PIPE_PATH);
     
     fl_listdirectory("/");
 
@@ -104,6 +108,10 @@ void media_close(){
 
 int read_entry_from_pipe(char *pipe_path)
 {
+    char cmd[300] = "sudo python ";
+    strcat(cmd, SCRIPT_PATH);
+    system(cmd);
+    
 #define MAX_BUF 1024
     char buf[MAX_BUF];
     
@@ -119,12 +127,12 @@ int read_entry_from_pipe(char *pipe_path)
     
     while(1)
     {
+        
         count++;
         ret = sscanf(buf+loc_buf_point, "%s %u", filename, &fsize);
         func(filename, fsize);
         
-        while((ch = *(buf+(loc_buf_point++))) != '\n' && ch != EOF)
-            ++loc_buf_point;
+        while((ch = *(buf+(loc_buf_point++))) != '\n' && ch != EOF);
         
         if(ch == EOF)
             break;
@@ -139,6 +147,8 @@ void read_pipe(char *pipe_path, char *buf)
     
     fd = open(pipe_path, O_RDONLY);
     read(fd, buf, MAX_BUF);
+    
+    printf("Recieved : [%s]\n", buf);
     
     close(fd);
 }
