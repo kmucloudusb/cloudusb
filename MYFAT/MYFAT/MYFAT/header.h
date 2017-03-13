@@ -2868,14 +2868,14 @@ void func(char *file_name, uint32 file_size_byte) {
     
     file->parentcluster = fatfs_get_root_cluster(&_fs);
     
-    // need?
+    // Is same file name
     if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename, &sfEntry) == 1)
     {
         _free_file(file);
         return ;
     }
     
-    // need?
+    // ?
     file->startcluster = 0;
     
     if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, 1))
@@ -2884,10 +2884,68 @@ void func(char *file_name, uint32 file_size_byte) {
         return ;
     }
     
-    // only short file
-    fatfs_lfn_create_sfn(shortFilename, file->filename);
+    // Minimal code
+//    // only short file name support yet
+//    fatfs_lfn_create_sfn(shortFilename, file->filename);
+//    memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
+//    
+//    if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename))
+//    {
+//        // Delete allocated space
+//        fatfs_free_cluster_chain(&_fs, file->startcluster);
+//        
+//        _free_file(file);
+//        return ;
+//    }
+    
+    // Long file name + short file name
+#if FATFS_INC_LFN_SUPPORT
+    // Generate a short filename & tail
+    int tailNum = 0;
+    do
+    {
+        // Create a standard short filename (without tail)
+        fatfs_lfn_create_sfn(shortFilename, file->filename);
+        
+        // If second hit or more, generate a ~n tail
+        if (tailNum != 0)
+            fatfs_lfn_generate_tail((char*)file->shortfilename, shortFilename, tailNum);
+        // Try with no tail if first entry
+        else
+            memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
+        
+        // Check if entry exists already or not
+        if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename) == 0)
+            break;
+        
+        tailNum++;
+    }
+    while (tailNum < 9999);
+    
+    // We reached the max number of duplicate short file names (unlikely!)
+    if (tailNum == 9999)
+    {
+        // Delete allocated space
+        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        
+        _free_file(file);
+        return ;
+    }
+#else
+    // Create a standard short filename (without tail)
+    if (!fatfs_lfn_create_sfn(shortFilename, file->filename))
+    {
+        // Delete allocated space
+        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        
+        _free_file(file);
+        return ;
+    }
+    
+    // Copy to SFN space
     memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
     
+    // Check if entry exists already
     if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename))
     {
         // Delete allocated space
@@ -2896,6 +2954,7 @@ void func(char *file_name, uint32 file_size_byte) {
         _free_file(file);
         return ;
     }
+#endif
     
     if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, 0, 0))
     {
@@ -2916,6 +2975,7 @@ void func(char *file_name, uint32 file_size_byte) {
     file->last_fat_lookup.CurrentCluster = 0xFFFFFFFF;
     
     fatfs_fat_purge(&_fs);
+    /* Make file */
     
     _read_sectors(file, sector, file->file_data_sector, 1);
     
