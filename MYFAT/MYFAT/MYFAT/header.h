@@ -2364,8 +2364,6 @@ void* fl_fopen(const char *path, const char *mode)
     return file;
 }
 
-
-
 //
 //
 // fl_fwrite
@@ -2848,7 +2846,7 @@ void fl_fclose(void *f)
 // my func
 // make file from G-drive file list
 
-void func(char *file_name, uint32 file_size_byte) {
+void write_file_on_media(char *file_name, uint32 file_size_byte) {
     FL_FILE* file;
     struct fat_dir_entry sfEntry;
     char shortFilename[FAT_SFN_SIZE_FULL];
@@ -2884,7 +2882,7 @@ void func(char *file_name, uint32 file_size_byte) {
         return ;
     }
     
-    // Minimal code
+    // Minimal file name code
 //    // only short file name support yet
 //    fatfs_lfn_create_sfn(shortFilename, file->filename);
 //    memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
@@ -2977,6 +2975,7 @@ void func(char *file_name, uint32 file_size_byte) {
     fatfs_fat_purge(&_fs);
     /* Make file */
     
+    // Larger than 512 bytes need to be tested
     _read_sectors(file, sector, file->file_data_sector, 1);
     
     file->file_data_address = sector;
@@ -2986,8 +2985,6 @@ void func(char *file_name, uint32 file_size_byte) {
     // Only require some of this sector?
     if (copyCount > (length - bytesWritten))
         copyCount = (length - bytesWritten);
-    
-//    memcpy((uint8*)(file->file_data_sector + offset), (uint8*)(data + bytesWritten), copyCount);
     
     file->file_data_dirty = 1;
     

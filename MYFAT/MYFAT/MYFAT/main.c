@@ -131,7 +131,7 @@ int read_entry_from_pipe(char *pipe_path)
         
         count++;
         ret = sscanf(buf+loc_buf_point, "%s %u", filename, &fsize);
-        func(filename, fsize);
+        write_file_on_media(filename, fsize);
         
         while((ch = *(buf+(loc_buf_point++))) != '\n' && ch != '\0');
         
