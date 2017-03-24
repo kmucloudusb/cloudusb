@@ -229,8 +229,10 @@ int main(int argc, char *argv[])
     }
     
     // List root directory
-    fl_listdirectory("/");
+    //fl_listdirectory("/");
     
+    //test();
+
     // Create File
     file = fl_fopen("/file.bin", "w");
     if (file)
