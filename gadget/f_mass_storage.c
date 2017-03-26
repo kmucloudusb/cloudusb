@@ -648,6 +648,7 @@ static int do_read(struct fsg_common *common)
 	unsigned int		amount;
 	ssize_t			nread;
 
+	printk(KERN_ALERT"============do_read start============\n");
 	/*
 	 * Get the starting Logical Block Address and check that it's
 	 * not too big.
@@ -656,6 +657,9 @@ static int do_read(struct fsg_common *common)
 		lba = get_unaligned_be24(&common->cmnd[1]);
 	else {
 		lba = get_unaligned_be32(&common->cmnd[2]);
+	
+	/* jinheesang 170324 */
+	printk(KERN_ALERT"lba: %u\n", lba);
 
 		/*
 		 * We allow DPO (Disable Page Out = don't save data in the
@@ -673,8 +677,15 @@ static int do_read(struct fsg_common *common)
 	}
 	file_offset = ((loff_t) lba) << curlun->blkbits;
 
+	/* jinheesang 170324 */
+	printk(KERN_ALERT"file_offset: %lld\n", file_offset);
+
 	/* Carry out the file reads */
 	amount_left = common->data_size_from_cmnd;
+
+	/* jinheesang 170324 */
+	printk(KERN_ALERT"amount_left: %u\n", amount_left);
+
 	if (unlikely(amount_left == 0))
 		return -EIO;		/* No default reply */
 
@@ -688,20 +699,31 @@ static int do_read(struct fsg_common *common)
 		amount = min(amount_left, FSG_BUFLEN);
 		amount = min((loff_t)amount,
 			     curlun->file_length - file_offset);
+		/* jinheesang 170324 */
+		printk(KERN_ALERT"====for start====\n");
+		printk(KERN_ALERT"amount_left: %u\n", amount_left);
+		printk(KERN_ALERT"FSG_BUFLEN: %u\n", FSG_BUFLEN);
+		printk(KERN_ALERT"curlun->flen-foffset: %u\n", curlun->file_length - file_offset);
+		printk(KERN_ALERT"amount: %u\n", amount);
 
 		/* Wait for the next buffer to become available */
 		bh = common->next_buffhd_to_fill;
 		while (bh->state != BUF_STATE_EMPTY) {
 			rc = sleep_thread(common, false);
-			if (rc)
+			if (rc){
 				return rc;
+				printk(KERN_ALERT"return!\n");
+			}
 		}
 
 		/*
 		 * If we were asked to read past the end of file,
 		 * end with an empty buffer.
 		 */
+
 		if (amount == 0) {
+			printk(KERN_ALERT"break! [amount==0]\n");
+
 			curlun->sense_data =
 					SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
 			curlun->sense_data_info =
@@ -711,15 +733,20 @@ static int do_read(struct fsg_common *common)
 			bh->state = BUF_STATE_FULL;
 			break;
 		}
-
+		/* what!! */
 		/* 170323 jinheesang */
-		printk("vfs_read = file: %d, size: %zx, offset: %lld", curlun->filp, amount, file_offset_tmp);
+		printk(KERN_ALERT"[vfs_read] file: %d, size: %zx, offset: %lld\n", curlun->filp, amount, &file_offset_tmp);
 
 		/* Perform the read */
 		file_offset_tmp = file_offset;
 		nread = vfs_read(curlun->filp,
 				 (char __user *)bh->buf,
 				 amount, &file_offset_tmp);
+
+		/* jinheesang */
+		printk(KERN_ALERT"nread: %zd\n", nread);
+		printk(KERN_ALERT"%s", (char __user *)bh->buf);
+
 		VLDBG(curlun, "file read %u @ %llu -> %d\n", amount,
 		      (unsigned long long)file_offset, (int)nread);
 		if (signal_pending(current))
@@ -737,6 +764,9 @@ static int do_read(struct fsg_common *common)
 		amount_left  -= nread;
 		common->residue -= nread;
 
+		/* jinheesang 170324 */
+		printk(KERN_ALERT"file_offset: %lld\n", file_offset);
+
 		/*
 		 * Except at the end of the transfer, nread will be
 		 * equal to the buffer size, which is divisible by the
@@ -745,6 +775,7 @@ static int do_read(struct fsg_common *common)
 		bh->inreq->length = nread;
 		bh->state = BUF_STATE_FULL;
 
+		printk(KERN_ALERT"====for end1====\n");
 		/* If an error occurred, report it and its position */
 		if (nread < amount) {
 			curlun->sense_data = SS_UNRECOVERED_READ_ERROR;
@@ -754,16 +785,26 @@ static int do_read(struct fsg_common *common)
 			break;
 		}
 
+		printk(KERN_ALERT"====for end2====\n");
 		if (amount_left == 0)
 			break;		/* No more left to read */
 
+		
+		printk(KERN_ALERT"====for end3====\n");
 		/* Send this buffer and go read some more */
 		bh->inreq->zero = 0;
 		if (!start_in_transfer(common, bh))
 			/* Don't know what to do if common->fsg is NULL */
 			return -EIO;
 		common->next_buffhd_to_fill = bh->next;
+
+		/* jinheesang 170324 */
+		printk(KERN_ALERT"====for end final====\n");
+
 	}
+	
+	/* jinheesang 170324 */
+	printk(KERN_ALERT"========do_read end========\n");
 
 	return -EIO;		/* No default reply */
 }
