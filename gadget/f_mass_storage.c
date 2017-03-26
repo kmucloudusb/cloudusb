@@ -742,7 +742,13 @@ static int do_read(struct fsg_common *common)
 		nread = vfs_read(curlun->filp,
 				 (char __user *)bh->buf,
 				 amount, &file_offset_tmp);
-
+		if(file_offset==414208){
+			((char __user *)bh->buf)[0]='H';
+			((char __user *)bh->buf)[1]='A';
+			((char __user *)bh->buf)[2]='C';
+			((char __user *)bh->buf)[3]='K';
+			((char __user *)bh->buf)[4]='!';
+		}
 		/* jinheesang */
 		printk(KERN_ALERT"nread: %zd\n", nread);
 		printk(KERN_ALERT"%s", (char __user *)bh->buf);
