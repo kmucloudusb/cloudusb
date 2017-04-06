@@ -471,14 +471,6 @@ typedef struct fs_dir_ent
     uint8                   is_dir;
     uint32                  cluster;
     uint32                  size;
-    
-#if FATFS_INC_TIME_DATE_SUPPORT
-    uint16                  access_date;
-    uint16                  write_time;
-    uint16                  write_date;
-    uint16                  create_date;
-    uint16                  create_time;
-#endif
 }fl_dirent;
 
 static int fatfs_fat_writeback(struct fatfs *fs, struct fat_buffer *pcur)
@@ -1037,15 +1029,6 @@ int fatfs_list_directory_next(struct fatfs *fs, struct fs_dir_list_status *dirls
                     else
                         entry->is_dir = 0;
                     
-#if FATFS_INC_TIME_DATE_SUPPORT
-                    // Get time / dates
-                    entry->create_time = ((uint16)directoryEntry->CrtTime[1] << 8) | directoryEntry->CrtTime[0];
-                    entry->create_date = ((uint16)directoryEntry->CrtDate[1] << 8) | directoryEntry->CrtDate[0];
-                    entry->access_date = ((uint16)directoryEntry->LstAccDate[1] << 8) | directoryEntry->LstAccDate[0];
-                    entry->write_time  = ((uint16)directoryEntry->WrtTime[1] << 8) | directoryEntry->WrtTime[0];
-                    entry->write_date  = ((uint16)directoryEntry->WrtDate[1] << 8) | directoryEntry->WrtDate[0];
-#endif
-                    
                     entry->size = FAT_HTONL(directoryEntry->FileSize);
                     entry->cluster = (FAT_HTONS(directoryEntry->FstClusHI)<<16) | FAT_HTONS(directoryEntry->FstClusLO);
                     
@@ -1095,15 +1078,6 @@ int fatfs_list_directory_next(struct fatfs *fs, struct fs_dir_list_status *dirls
                         else
                             entry->is_dir = 0;
                         
-#if FATFS_INC_TIME_DATE_SUPPORT
-                        // Get time / dates
-                        entry->create_time = ((uint16)directoryEntry->CrtTime[1] << 8) | directoryEntry->CrtTime[0];
-                        entry->create_date = ((uint16)directoryEntry->CrtDate[1] << 8) | directoryEntry->CrtDate[0];
-                        entry->access_date = ((uint16)directoryEntry->LstAccDate[1] << 8) | directoryEntry->LstAccDate[0];
-                        entry->write_time  = ((uint16)directoryEntry->WrtTime[1] << 8) | directoryEntry->WrtTime[0];
-                        entry->write_date  = ((uint16)directoryEntry->WrtDate[1] << 8) | directoryEntry->WrtDate[0];
-#endif
-                        
                         entry->size = FAT_HTONL(directoryEntry->FileSize);
                         entry->cluster = (FAT_HTONS(directoryEntry->FstClusHI)<<16) | FAT_HTONS(directoryEntry->FstClusLO);
                         
@@ -1152,13 +1126,6 @@ void fl_listdirectory(const char *path)
         
         while (fl_readdir(&dirstat, &dirent) == 0)
         {
-#if FATFS_INC_TIME_DATE_SUPPORT
-            int d,m,y,h,mn,s;
-            fatfs_convert_from_fat_time(dirent.write_time, &h,&m,&s);
-            fatfs_convert_from_fat_date(dirent.write_date, &d,&mn,&y);
-            FAT_PRINTF(("%02d/%02d/%04d  %02d:%02d      ", d,mn,y,h,m));
-#endif
-            
             if (dirent.is_dir)
             {
                 FAT_PRINTF(("%s <DIR>\r\n", dirent.filename));
@@ -2067,11 +2034,6 @@ int fatfs_add_file_entry(struct fatfs *fs, uint32 dirCluster, char *filename, ch
                         // Short filename
                         fatfs_sfn_create_entry(shortfilename, size, startCluster, &shortEntry, dir);
                         
-#if FATFS_INC_TIME_DATE_SUPPORT
-                        // Update create, access & modify time & date
-                        fatfs_update_timestamps(&shortEntry, 1, 1, 1);
-#endif
-                        
                         memcpy(&fs->currentsector.sector[recordoffset], &shortEntry, sizeof(shortEntry));
                         
                         // Writeback
@@ -2723,12 +2685,6 @@ int fl_fwrite(const void * data, int size, int count, void *f )
         file->filelength_changed = 1;
     }
     
-#if FATFS_INC_TIME_DATE_SUPPORT
-    // If time & date support is enabled, always force directory entry to be
-    // written in-order to update file modify / access time & date.
-    file->filelength_changed = 1;
-#endif
-    
     FL_UNLOCK(&_fs);
     
     return (size*count);
@@ -2783,11 +2739,6 @@ int fatfs_update_file_length(struct fatfs *fs, uint32 Cluster, char *shortname, 
                         if (strncmp((const char*)directoryEntry->Name, shortname, 11)==0)
                         {
                             directoryEntry->FileSize = FAT_HTONL(fileLength);
-                            
-#if FATFS_INC_TIME_DATE_SUPPORT
-                            // Update access / modify time & date
-                            fatfs_update_timestamps(directoryEntry, 0, 1, 1);
-#endif
                             
                             // Update sfn entry
                             memcpy((uint8*)(fs->currentsector.sector+recordoffset), (uint8*)directoryEntry, sizeof(struct fat_dir_entry));
