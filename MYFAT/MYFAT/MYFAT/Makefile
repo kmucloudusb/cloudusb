@@ -1,8 +1,12 @@
-main.out : fat_string.o
-	gcc -o main.out main.c fat_string.o -D_FILE_OFFSET_BITS=64 -lfuse
+CC = gcc
+CFLAGS = -W -Wall
+TARGET = main.out
+OBJECTS = fat_string.o main.o
 
-fat_string.o : fat_string.c
-	gcc -c -o fat_string.o fat_string.c
+all : $(TARGET)
+
+$(TARGET) : $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
 
 clean :
 	rm *.o main.out
