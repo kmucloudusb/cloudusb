@@ -11,9 +11,9 @@
 //
 // FL_FILE
 
-typedef unsigned char uint8;
-typedef unsigned short uint16;
-typedef unsigned int uint32;
+//typedef unsigned char uint8;
+//typedef unsigned short uint16;
+//typedef unsigned int uint32;
 
 struct fat_node
 {

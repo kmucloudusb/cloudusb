@@ -15,7 +15,7 @@ from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
 
-Path = "/Users/lunahc92/Desktop/myfifo"
+Path = "home/pi/capstone/cloudeusb/myfifo"
 
 try:
     import argparse

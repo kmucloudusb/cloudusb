@@ -5,9 +5,9 @@
 #include <sys/stat.h>
 #include "header.h"
 
-#define SCRIPT_PATH "/Users/lunahc92/Desktop/newFAT32/googledrive/list.py"
-#define IMAGE_PATH "/Users/lunahc92/Desktop/test.dmg"
-#define PIPE_PATH "/Users/lunahc92/Desktop/myfifo"
+#define SCRIPT_PATH "/home/pi/capstone/cloudeusb/googledrive/list.py --noauth_local_webserver"
+#define IMAGE_PATH "/piusb.bin"
+#define PIPE_PATH "/home/pi/capstone/cloudeusb/myfifo"
 
 int in_file;
 int out_file;

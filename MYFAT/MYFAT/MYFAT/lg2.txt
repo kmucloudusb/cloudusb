@@ -1,0 +1,20 @@
+/usr/local/lib/python2.7/dist-packages/oauth2client/_helpers.py:255: UserWarning: Cannot access /root/.credentials/drive-python-quickstart.json: No such file or directory
+  warnings.warn(_MISSING_FILE_MESSAGE.format(filename))
+
+Go to the following link in your browser:
+
+    https://accounts.google.com/o/oauth2/auth?scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.file&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob&response_type=code&client_id=1020751216695-v976he14dr1t2s7lbcpr93on4vv9e6b6.apps.googleusercontent.com&access_type=offline
+
+Enter verification code: Traceback (most recent call last):
+  File "/home/pi/capstone/cloudeusb/googledrive/list.py", line 143, in <module>
+    main()
+  File "/home/pi/capstone/cloudeusb/googledrive/list.py", line 75, in main
+    credentials = get_credentials()
+  File "/home/pi/capstone/cloudeusb/googledrive/list.py", line 62, in get_credentials
+    credentials = tools.run_flow(flow, store, flags)
+  File "/usr/local/lib/python2.7/dist-packages/oauth2client/_helpers.py", line 133, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python2.7/dist-packages/oauth2client/tools.py", line 239, in run_flow
+    code = input('Enter verification code: ').strip()
+KeyboardInterrupt
+Recieved : [œ³¾p³¾€®ø¶]
