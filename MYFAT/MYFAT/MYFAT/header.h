@@ -471,14 +471,6 @@ typedef struct fs_dir_ent
     uint8                   is_dir;
     uint32                  cluster;
     uint32                  size;
-    
-#if FATFS_INC_TIME_DATE_SUPPORT
-    uint16                  access_date;
-    uint16                  write_time;
-    uint16                  write_date;
-    uint16                  create_date;
-    uint16                  create_time;
-#endif
 }fl_dirent;
 
 static int fatfs_fat_writeback(struct fatfs *fs, struct fat_buffer *pcur)
@@ -1037,15 +1029,6 @@ int fatfs_list_directory_next(struct fatfs *fs, struct fs_dir_list_status *dirls
                     else
                         entry->is_dir = 0;
                     
-#if FATFS_INC_TIME_DATE_SUPPORT
-                    // Get time / dates
-                    entry->create_time = ((uint16)directoryEntry->CrtTime[1] << 8) | directoryEntry->CrtTime[0];
-                    entry->create_date = ((uint16)directoryEntry->CrtDate[1] << 8) | directoryEntry->CrtDate[0];
-                    entry->access_date = ((uint16)directoryEntry->LstAccDate[1] << 8) | directoryEntry->LstAccDate[0];
-                    entry->write_time  = ((uint16)directoryEntry->WrtTime[1] << 8) | directoryEntry->WrtTime[0];
-                    entry->write_date  = ((uint16)directoryEntry->WrtDate[1] << 8) | directoryEntry->WrtDate[0];
-#endif
-                    
                     entry->size = FAT_HTONL(directoryEntry->FileSize);
                     entry->cluster = (FAT_HTONS(directoryEntry->FstClusHI)<<16) | FAT_HTONS(directoryEntry->FstClusLO);
                     
@@ -1095,15 +1078,6 @@ int fatfs_list_directory_next(struct fatfs *fs, struct fs_dir_list_status *dirls
                         else
                             entry->is_dir = 0;
                         
-#if FATFS_INC_TIME_DATE_SUPPORT
-                        // Get time / dates
-                        entry->create_time = ((uint16)directoryEntry->CrtTime[1] << 8) | directoryEntry->CrtTime[0];
-                        entry->create_date = ((uint16)directoryEntry->CrtDate[1] << 8) | directoryEntry->CrtDate[0];
-                        entry->access_date = ((uint16)directoryEntry->LstAccDate[1] << 8) | directoryEntry->LstAccDate[0];
-                        entry->write_time  = ((uint16)directoryEntry->WrtTime[1] << 8) | directoryEntry->WrtTime[0];
-                        entry->write_date  = ((uint16)directoryEntry->WrtDate[1] << 8) | directoryEntry->WrtDate[0];
-#endif
-                        
                         entry->size = FAT_HTONL(directoryEntry->FileSize);
                         entry->cluster = (FAT_HTONS(directoryEntry->FstClusHI)<<16) | FAT_HTONS(directoryEntry->FstClusLO);
                         
@@ -1151,23 +1125,10 @@ void fl_listdirectory(const char *path)
         struct fs_dir_ent dirent;
         
         while (fl_readdir(&dirstat, &dirent) == 0)
-        {
-#if FATFS_INC_TIME_DATE_SUPPORT
-            int d,m,y,h,mn,s;
-            fatfs_convert_from_fat_time(dirent.write_time, &h,&m,&s);
-            fatfs_convert_from_fat_date(dirent.write_date, &d,&mn,&y);
-            FAT_PRINTF(("%02d/%02d/%04d  %02d:%02d      ", d,mn,y,h,m));
-#endif
-            
             if (dirent.is_dir)
-            {
                 FAT_PRINTF(("%s <DIR>\r\n", dirent.filename));
-            }
             else
-            {
-                FAT_PRINTF(("%s [%d bytes]\r\n", dirent.filename, dirent.size));
-            }
-        }
+                FAT_PRINTF(("%s [%d bytes %d cluster]\r\n", dirent.filename, dirent.size, dirent.cluster));
     }
     
     FL_UNLOCK(&_fs);
@@ -2067,11 +2028,6 @@ int fatfs_add_file_entry(struct fatfs *fs, uint32 dirCluster, char *filename, ch
                         // Short filename
                         fatfs_sfn_create_entry(shortfilename, size, startCluster, &shortEntry, dir);
                         
-#if FATFS_INC_TIME_DATE_SUPPORT
-                        // Update create, access & modify time & date
-                        fatfs_update_timestamps(&shortEntry, 1, 1, 1);
-#endif
-                        
                         memcpy(&fs->currentsector.sector[recordoffset], &shortEntry, sizeof(shortEntry));
                         
                         // Writeback
@@ -2723,12 +2679,6 @@ int fl_fwrite(const void * data, int size, int count, void *f )
         file->filelength_changed = 1;
     }
     
-#if FATFS_INC_TIME_DATE_SUPPORT
-    // If time & date support is enabled, always force directory entry to be
-    // written in-order to update file modify / access time & date.
-    file->filelength_changed = 1;
-#endif
-    
     FL_UNLOCK(&_fs);
     
     return (size*count);
@@ -2783,11 +2733,6 @@ int fatfs_update_file_length(struct fatfs *fs, uint32 Cluster, char *shortname, 
                         if (strncmp((const char*)directoryEntry->Name, shortname, 11)==0)
                         {
                             directoryEntry->FileSize = FAT_HTONL(fileLength);
-                            
-#if FATFS_INC_TIME_DATE_SUPPORT
-                            // Update access / modify time & date
-                            fatfs_update_timestamps(directoryEntry, 0, 1, 1);
-#endif
                             
                             // Update sfn entry
                             memcpy((uint8*)(fs->currentsector.sector+recordoffset), (uint8*)directoryEntry, sizeof(struct fat_dir_entry));
@@ -2846,7 +2791,8 @@ void fl_fclose(void *f)
 // my func
 // make file from G-drive file list
 
-void write_file_on_media(char *file_name, uint32 file_size_byte) {
+void write_file_on_media(char *file_name, uint32 file_size_byte)
+{
     FL_FILE* file;
     struct fat_dir_entry sfEntry;
     char shortFilename[FAT_SFN_SIZE_FULL];
@@ -2881,20 +2827,6 @@ void write_file_on_media(char *file_name, uint32 file_size_byte) {
         _free_file(file);
         return ;
     }
-    
-    // Minimal file name code
-//    // only short file name support yet
-//    fatfs_lfn_create_sfn(shortFilename, file->filename);
-//    memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
-//    
-//    if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename))
-//    {
-//        // Delete allocated space
-//        fatfs_free_cluster_chain(&_fs, file->startcluster);
-//        
-//        _free_file(file);
-//        return ;
-//    }
     
     // Long file name + short file name
 #if FATFS_INC_LFN_SUPPORT
@@ -2996,6 +2928,31 @@ void write_file_on_media(char *file_name, uint32 file_size_byte) {
     file->filelength_changed = 1;
     
     fl_fclose(file);
+}
+
+//
+// my func
+// ret filename from block #
+
+void print_file_name_from_block_num(uint32 blocknum)
+{
+    uint32 cluster = (blocknum - (_fs.rootdir_first_sector * 512))/512 + _fs.rootdir_first_cluster;
+    FAT_PRINTF(("cluster = %u\r\n", cluster));
+    
+    FL_DIR dirstat;
+    
+    FL_LOCK(&_fs);
+    
+    if (fl_opendir("/", &dirstat))
+    {
+        struct fs_dir_ent dirent;
+        
+        while (fl_readdir(&dirstat, &dirent) == 0)
+            if(cluster == dirent.cluster)
+                FAT_PRINTF(("\t%s [%u bytes %u cluster]\n", dirent.filename, dirent.size, dirent.cluster-2));
+    }
+    
+    FL_UNLOCK(&_fs);
 }
 
 #endif /* header_h */

@@ -5,9 +5,9 @@
 #include <sys/stat.h>
 #include "header.h"
 
-#define SCRIPT_PATH "/home/pi/capstone/cloudeusb/googledrive/list.py --noauth_local_webserver"
-#define IMAGE_PATH "/piusb.bin"
-#define PIPE_PATH "/home/pi/capstone/cloudeusb/myfifo"
+#define SCRIPT_PATH "/Users/lunahc92/Desktop/USB/googledrive/list.py"
+#define IMAGE_PATH "/Users/lunahc92/Desktop/Capstone/env/fat32_sample.dmg"
+#define PIPE_PATH "/Users/lunahc92/Desktop/Capstone/env/myfifo"
 
 int in_file;
 int out_file;
@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
     
     read_entry_from_pipe(PIPE_PATH);
     
-//    fl_listdirectory("/");
+    fl_listdirectory("/");
 
     media_close();
 }

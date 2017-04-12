@@ -82,9 +82,4 @@ extern int printf(const char* ctrl1, ... );
 #endif
 #endif
 
-// Time/Date support requires time.h
-#if FATFS_INC_TIME_DATE_SUPPORT
-#include <time.h>
-#endif
-
 #endif
