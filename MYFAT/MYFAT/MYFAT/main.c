@@ -5,10 +5,6 @@
 #include <sys/stat.h>
 #include "header.h"
 
-#define SCRIPT_PATH "/Users/lunahc92/Desktop/USB/googledrive/list.py"
-#define IMAGE_PATH "/Users/lunahc92/Desktop/Capstone/env/fat32_sample.dmg"
-#define PIPE_PATH "/Users/lunahc92/Desktop/Capstone/env/myfifo"
-
 int in_file;
 int out_file;
 
@@ -17,12 +13,24 @@ int media_read(unsigned long sector, unsigned char *buffer, unsigned long sector
 int media_write(unsigned long sector, unsigned char *buffer, unsigned long sector_count);
 void media_close();
 
-int read_entry_from_pipe(char *pipe_path);
+int read_entry_from_pipe(char *pipe_path, char *script_path);
 void read_pipe(char *pipe_path, char *buf);
+
+void read_path(char *script_path, char *image_path, char *pipe_path, char *exec_path);
 
 int main(int argc, char *argv[])
 {
-    if (media_init(IMAGE_PATH) != 1)
+    char script_path[256];
+    char image_path[256];
+    char pipe_path[256];
+    
+    read_path(script_path, image_path, pipe_path, argv[0]);
+    
+    puts(script_path);
+    puts(image_path);
+    puts(pipe_path);
+    
+    if (media_init(image_path) != 1)
     {
         puts("media_init error");
         return -1;
@@ -36,10 +44,10 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    read_entry_from_pipe(PIPE_PATH);
+    read_entry_from_pipe(pipe_path, script_path);
     
     fl_listdirectory("/");
-
+    
     media_close();
 }
 
@@ -107,10 +115,12 @@ void media_close(){
     close(in_file);
 }
 
-int read_entry_from_pipe(char *pipe_path)
+int read_entry_from_pipe(char *pipe_path, char *script_path)
 {
     char cmd[300] = "sudo python ";
-    strcat(cmd, SCRIPT_PATH);
+    strcat(cmd, script_path);
+    strcat(cmd, " --path ");
+    strcat(cmd, pipe_path);
     system(cmd);
     
 #define MAX_BUF 1024
@@ -128,7 +138,6 @@ int read_entry_from_pipe(char *pipe_path)
     
     while(1)
     {
-        
         count++;
         ret = sscanf(buf+loc_buf_point, "%s %u", filename, &fsize);
         write_file_on_media(filename, fsize);
@@ -152,4 +161,15 @@ void read_pipe(char *pipe_path, char *buf)
     printf("Recieved : [%s]\n", buf);
     
     close(fd);
+}
+
+void read_path(char *script_path, char *image_path, char *pipe_path, char *exec_path)
+{
+    strcpy(script_path, exec_path);
+    strcpy(image_path, exec_path);
+    strcpy(pipe_path, exec_path);
+    
+    strcpy(&(script_path[strlen(script_path)-8]), "../../../googledrive/list.py");
+    strcpy(&(image_path[strlen(image_path)-8]), "../../../image.dmg");
+    strcpy(&(pipe_path[strlen(pipe_path)-8]), "../../../myfifo");
 }
