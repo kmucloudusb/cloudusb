@@ -434,3 +434,81 @@ int fatfs_create_path_string(char* path, char *filename, char* out, int maxlen)
 
     return 0;
 }
+//-----------------------------------------------------------------------------
+// Test Bench
+//-----------------------------------------------------------------------------
+#ifdef FAT_STRING_TESTBENCH
+void main(void)
+{
+    char output[255];
+    char output2[255];
+
+    assert(fatfs_total_path_levels("C:\\folder\\file.zip") == 1);
+    assert(fatfs_total_path_levels("C:\\file.zip") == 0);
+    assert(fatfs_total_path_levels("C:\\folder\\folder2\\file.zip") == 2);
+    assert(fatfs_total_path_levels("C:\\") == -1);
+    assert(fatfs_total_path_levels("") == -1);
+    assert(fatfs_total_path_levels("/dev/etc/file.zip") == 2);
+    assert(fatfs_total_path_levels("/dev/file.zip") == 1);
+
+    assert(fatfs_get_substring("C:\\folder\\file.zip", 0, output, sizeof(output)) == 0);
+    assert(strcmp(output, "folder") == 0);
+
+    assert(fatfs_get_substring("C:\\folder\\file.zip", 1, output, sizeof(output)) == 0);
+    assert(strcmp(output, "file.zip") == 0);
+
+    assert(fatfs_get_substring("/dev/etc/file.zip", 0, output, sizeof(output)) == 0);
+    assert(strcmp(output, "dev") == 0);
+
+    assert(fatfs_get_substring("/dev/etc/file.zip", 1, output, sizeof(output)) == 0);
+    assert(strcmp(output, "etc") == 0);
+
+    assert(fatfs_get_substring("/dev/etc/file.zip", 2, output, sizeof(output)) == 0);
+    assert(strcmp(output, "file.zip") == 0);
+
+    assert(fatfs_split_path("C:\\folder\\file.zip", output, sizeof(output), output2, sizeof(output2)) == 0);
+    assert(strcmp(output, "C:\\folder") == 0);
+    assert(strcmp(output2, "file.zip") == 0);
+
+    assert(fatfs_split_path("C:\\file.zip", output, sizeof(output), output2, sizeof(output2)) == 0);
+    assert(output[0] == 0);
+    assert(strcmp(output2, "file.zip") == 0);
+
+    assert(fatfs_split_path("/dev/etc/file.zip", output, sizeof(output), output2, sizeof(output2)) == 0);
+    assert(strcmp(output, "/dev/etc") == 0);
+    assert(strcmp(output2, "file.zip") == 0);
+
+    assert(FileString_GetExtension("C:\\file.zip") == strlen("C:\\file"));
+    assert(FileString_GetExtension("C:\\file.zip.ext") == strlen("C:\\file.zip"));
+    assert(FileString_GetExtension("C:\\file.zip.") == strlen("C:\\file.zip"));
+
+    assert(FileString_TrimLength("C:\\file.zip", strlen("C:\\file.zip")) == strlen("C:\\file.zip"));
+    assert(FileString_TrimLength("C:\\file.zip   ", strlen("C:\\file.zip   ")) == strlen("C:\\file.zip"));
+    assert(FileString_TrimLength("   ", strlen("   ")) == 0);
+
+    assert(fatfs_compare_names("C:\\file.ext", "C:\\file.ext") == 1);
+    assert(fatfs_compare_names("C:\\file2.ext", "C:\\file.ext") == 0);
+    assert(fatfs_compare_names("C:\\file  .ext", "C:\\file.ext") == 1);
+    assert(fatfs_compare_names("C:\\file  .ext", "C:\\file2.ext") == 0);
+
+    assert(fatfs_string_ends_with_slash("C:\\folder") == 0);
+    assert(fatfs_string_ends_with_slash("C:\\folder\\") == 1);
+    assert(fatfs_string_ends_with_slash("/path") == 0);
+    assert(fatfs_string_ends_with_slash("/path/a") == 0);
+    assert(fatfs_string_ends_with_slash("/path/") == 1);
+
+    assert(fatfs_get_extension("/mypath/file.wav", output, 4) == 1);
+    assert(strcmp(output, "wav") == 0);
+    assert(fatfs_get_extension("/mypath/file.WAV", output, 4) == 1);
+    assert(strcmp(output, "wav") == 0);
+    assert(fatfs_get_extension("/mypath/file.zip", output, 4) == 1);
+    assert(strcmp(output, "ext") != 0);
+
+    assert(fatfs_create_path_string("/mydir1", "myfile.txt", output, sizeof(output)) == 1);
+    assert(strcmp(output, "/mydir1/myfile.txt") == 0);
+    assert(fatfs_create_path_string("/mydir2/", "myfile2.txt", output, sizeof(output)) == 1);
+    assert(strcmp(output, "/mydir2/myfile2.txt") == 0);
+    assert(fatfs_create_path_string("C:\\mydir3", "myfile3.txt", output, sizeof(output)) == 1);
+    assert(strcmp(output, "C:\\mydir3\\myfile3.txt") == 0);
+}
+#endif
