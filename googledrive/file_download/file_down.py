@@ -91,7 +91,7 @@ def main():
     #   https://developers.google.com/resources/api-libraries/documentation/drive/v3/python/latest/index.html
     #
     # QUERY: list() 안에서 q="" 에 들어가는 쿼리문에 대한 문서
-    #   https://developers.google.com/drive/v3/web/search-parameters#fn1
+    #   https://developers.google.com/drive/v3/web/search-parameters
     #
 
 
@@ -123,11 +123,25 @@ def main():
         print(file)
 
 
+    ## 파일 이름으로 파일 아이디 찾기 
+    # 주의: 다른 폴더 같은 이름도 다 찾으므로, 지금은 이름 다르게 해야함
+
+    target_file_name = "movie.wmv"
+    
+    target_file = service.files().list(
+        q=("name = '%s'" % target_file_name)).execute()
+    
+    if not target_file:
+        print(target_file_name + ": not found")
+        return
+    target_file_id = target_file.get('files')[0].get('id')
+    print("id: "+target_file_id)
+
     ## 파일 다운로드
-    down_file_id = '0B8CPvjgKUMvtM2tTWTctVzNrUm8'
-    down_file_name = 'downloaded_file'
-    down_byte_begin = 0
-    down_byte_end = 1787913
+    down_file_id = target_file_id #'0B8CPvjgKUMvtM2tTWTctVzNrUm8'
+    #down_file_name = 'downloaded_file'
+    #down_byte_begin = 0
+    #down_byte_end = 1787913
 
     ##1. 전체 파일 다운
     #download_file(service, down_file_id, down_file_name) 
