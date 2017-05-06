@@ -5,11 +5,6 @@
 #include "fat_filelib.h"
 #include "fat_custom.h"
 
-int media_init(char *media_path);
-int media_read(unsigned long sector, unsigned char *buffer, unsigned long sector_count);
-int media_write(unsigned long sector, unsigned char *buffer, unsigned long sector_count);
-void media_close();
-
 int main(int argc, char *argv[])
 {
     // Read paths to image, script, pipe
@@ -36,17 +31,6 @@ int main(int argc, char *argv[])
     
     // Write metadata on image file & Make allocation table
     make_metadata();
-    
-//    download_from_g_drive(char *fileid);
-//    read_file(int fd, uint32 sector, uint32 *buffer, uint32 sector_count);
-//    ans_request(uint32 offset, uint32 *buffer, uint32 offset_count);
-    
-    
-    
-    
-    
-    
-    
     
     // List root directory
     fl_listdirectory("/");

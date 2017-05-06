@@ -18,9 +18,8 @@
 // Locals
 //-----------------------------------------------------------------------------
 static int _image_fd;
-static int _real_fd;
 
-static struct fatfs _fs;
+extern struct fatfs _fs;
 static struct table _table[TABLE_NUMBER_FULL];
 static unsigned int _table_size;
 
@@ -47,7 +46,7 @@ void create_image()
     char cmd[CMD_LEN_FULL] = "sudo dd if=/dev/zero of=";
     
     strcpy(&(cmd[strlen(cmd)]), _image_path);
-    strcpy(&(cmd[strlen(cmd)]), " bs=1G count=1");
+    strcpy(&(cmd[strlen(cmd)]), " bs=1M count=1024");
     system(cmd);
     
     memset(cmd, 0x00, sizeof(char)*CMD_LEN_FULL);
@@ -124,7 +123,7 @@ void download_metadata()
     system(cmd);
 }
 
-// input : <file_name, file_size, file_id>
+// input : <filename, filesize, fileid, isdir>
 void read_pipe(char *buffer)
 {
     int fd;
@@ -144,10 +143,9 @@ void make_alloc_table(unsigned long table_num, uint32 start_cluster, uint32 fsiz
     strcpy(_table[table_num].fileid, fileid);
 }
 
-void write_metadata(char *filename, uint32 fsize)
+void write_metadata(char *filename, uint32 fsize, uint32 startcluster)
 {
-    
-//    write_file_on_media(filename, fsize);
+    write_entry(filename, fsize, startcluster);
 }
 
 void make_metadata()
@@ -172,7 +170,7 @@ void make_metadata()
         sscanf(filelist+offset, "%s %u %s", filename, &fsize, fileid);
         
         make_alloc_table(table_num++, empty_cluster_first, fsize, fileid);
-        write_metadata(filename, fsize);
+        write_metadata(filename, fsize, empty_cluster_first);
         
         while((ch = *(filelist+(offset++))) != '\n' && ch != '\0');
         empty_cluster_first += fsize/cluster_size + ((fsize%cluster_size)? 1: 0);
@@ -211,7 +209,7 @@ void ans_request(uint32 offset, uint32 *buffer, uint32 offset_count)
     int i;
     int fd = -1;
     
-    uint32 cluster = ((offset/512)/_fs.sectors_per_cluster);
+    uint32 cluster = (((offset/512) - (_fs.rootdir_first_sector))/_fs.sectors_per_cluster) - _fs.rootdir_first_cluster;
     
     for(i=0; i<_table_size; ++i)
         if(_table[i].start_cluster <= cluster && cluster < _table[i].size)
@@ -220,5 +218,5 @@ void ans_request(uint32 offset, uint32 *buffer, uint32 offset_count)
             break;
         }
     
-    read_file(fd, cluster - _table[i].start_cluster, buffer, offset_count/512);
+    read_file(fd, (cluster - _table[i].start_cluster) * _fs.sectors_per_cluster, buffer, offset_count/512);
 }
