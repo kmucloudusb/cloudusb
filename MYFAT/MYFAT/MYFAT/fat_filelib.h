@@ -9,19 +9,19 @@
 // Defines
 //-----------------------------------------------------------------------------
 #ifndef SEEK_CUR
-    #define SEEK_CUR    1
+#define SEEK_CUR    1
 #endif
 
 #ifndef SEEK_END
-    #define SEEK_END    2
+#define SEEK_END    2
 #endif
 
 #ifndef SEEK_SET
-    #define SEEK_SET    0
+#define SEEK_SET    0
 #endif
 
 #ifndef EOF
-    #define EOF         (-1)
+#define EOF         (-1)
 #endif
 
 //-----------------------------------------------------------------------------
@@ -45,20 +45,20 @@ typedef struct sFL_FILE
     char                    path[FATFS_MAX_LONG_FILENAME];
     char                    filename[FATFS_MAX_LONG_FILENAME];
     uint8                   shortfilename[11];
-
+    
 #ifdef FAT_CLUSTER_CACHE_ENTRIES
     uint32                  cluster_cache_idx[FAT_CLUSTER_CACHE_ENTRIES];
     uint32                  cluster_cache_data[FAT_CLUSTER_CACHE_ENTRIES];
 #endif
-
+    
     // Cluster Lookup
     struct cluster_lookup   last_fat_lookup;
-
+    
     // Read/Write sector buffer
     uint8                   file_data_sector[FAT_SECTOR_SIZE];
     uint32                  file_data_address;
     int                     file_data_dirty;
-
+    
     // File fopen flags
     uint8                   flags;
 #define FILE_READ           (1 << 0)
@@ -67,7 +67,7 @@ typedef struct sFL_FILE
 #define FILE_BINARY         (1 << 3)
 #define FILE_ERASE          (1 << 4)
 #define FILE_CREATE         (1 << 5)
-
+    
     struct fat_node         list_node;
 } FL_FILE;
 
