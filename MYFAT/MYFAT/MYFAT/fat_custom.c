@@ -145,7 +145,7 @@ void make_alloc_table(unsigned long table_num, uint32 start_cluster, uint32 fsiz
 
 void write_metadata(char *filename, uint32 fsize, uint32 startcluster)
 {
-    write_entry(filename, fsize, startcluster);
+    fl_fclose(write_entry(filename, fsize, startcluster));
 }
 
 void make_metadata()
