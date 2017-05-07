@@ -48,14 +48,6 @@ ROOT_FOLDER = "cloud_usb_test"  # 테스트를 위한 최상위 폴더
 
 
 def get_credentials():
-    """Gets valid user credentials from storage.
-
-    If nothing has been stored, or if the stored credentials are invalid,
-    the OAuth2 flow is completed to obtain the new credentials.
-
-    Returns:
-        Credentials, the obtained credential.
-    """
     home_dir = os.path.expanduser('~')
     credential_dir = os.path.join(home_dir, '.credentials')
     if not os.path.exists(credential_dir):
@@ -77,16 +69,11 @@ def get_credentials():
 
 
 def main():
-    """Shows basic usage of the Google Drive API.
-
-    Creates a Google Drive API service object and outputs the names and IDs
-    for up to 10 files.
-    """
+    # 구글 계정 권한 얻기
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
-    # === 17.01.31 ===#
     # API DOC: list() 에 들어가는 파라미터들(orderBy, q, fields 등)에 대한 문서 
     #   https://developers.google.com/resources/api-libraries/documentation/drive/v3/python/latest/index.html
     #
@@ -94,51 +81,20 @@ def main():
     #   https://developers.google.com/drive/v3/web/search-parameters
     #
 
-
-    # 1. ROOT_DIRECTORY 이름을 가진 최상위 폴더를 찾음
-    first_folder = service.files().list(
-        q=("mimeType = 'application/vnd.google-apps.folder' and name = '%s'" % ROOT_FOLDER)).execute()
-    first_folder_item = first_folder.get('files', [])
-    root_dir_id = 0
-    if not first_folder_item:
-        print('No %s found.' % ROOT_FOLDER)
-    else:
-        for item in first_folder_item:
-            root_dir_id = item['id']
-
-    # 2. 최상위 폴더부터 시작해서 모든 파일, 디렉토리 정보를 탐색
-    result_files = []
-    result_directories = []
-    listing_files(service, root_dir_id, "", result_files, result_directories)
-    del result_directories[0]
-
-    # 3. 탐색한 파일, 디렉토리 정보를 보여줌
-
-    print("1. directories list")
-    for path in result_directories:
-        print(path)
-    print()
-    print("2. files list")
-    for file in result_files:
-        print(file)
-
-
     ## 파일 이름으로 파일 아이디 찾기 
     # 주의: 다른 폴더 같은 이름도 다 찾으므로, 지금은 이름 다르게 해야함
+    # target_file_name = "movie.wmv"
+    # target_file = service.files().list(
+    #     q=("name = '%s'" % target_file_name)).execute()
+    # if not target_file:
+    #     print(target_file_name + ": not found")
+    #     return
+    # target_file_id = target_file.get('files')[0].get('id')
+    # print("id: "+target_file_id)
 
-    target_file_name = "movie.wmv"
-    
-    target_file = service.files().list(
-        q=("name = '%s'" % target_file_name)).execute()
-    
-    if not target_file:
-        print(target_file_name + ": not found")
-        return
-    target_file_id = target_file.get('files')[0].get('id')
-    print("id: "+target_file_id)
 
     ## 파일 다운로드
-    down_file_id = target_file_id #'0B8CPvjgKUMvtM2tTWTctVzNrUm8'
+    down_file_id = target_file_id '0B8CPvjgKUMvtM2tTWTctVzNrUm8'
     #down_file_name = 'downloaded_file'
     #down_byte_begin = 0
     #down_byte_end = 1787913
@@ -169,7 +125,7 @@ def listing_files(service, folderID, directory, result_files, result_directories
             if item['mimeType'] == FOLDER:
                 listing_files(service, item['id'], directory + "/%s" % item['name'], result_files, result_directories)
             else:
-                result_files.append('%s %s' % (directory + '/' + item['name'], item['id']))
+                result_files.append('%s %s' % (directory + '/' + item['name'], item['id'], itme['size']))
 
 
 ##==================================================================##
