@@ -143,9 +143,9 @@ void make_alloc_table(unsigned long table_num, uint32 start_cluster, uint32 fsiz
     strcpy(_table[table_num].fileid, fileid);
 }
 
-void write_metadata(char *filename, uint32 fsize, uint32 startcluster, int dir)
+uint32 write_metadata(char *filename, uint32 fsize, int dir)
 {
-    fl_fclose(write_entry(filename, fsize, startcluster, dir));
+    return write_entry(filename, fsize, dir);
 }
 
 void make_metadata()
@@ -170,8 +170,7 @@ void make_metadata()
     {
         sscanf(filelist+offset, "%s %u %s %d", filename, &fsize, fileid, &dir);
         
-        make_alloc_table(table_num++, empty_cluster_first, fsize, fileid);
-        write_metadata(filename, fsize, empty_cluster_first, dir);
+        make_alloc_table(table_num++, write_metadata(filename, fsize, dir), fsize, fileid);
         
         while((ch = *(filelist+(offset++))) != '\n' && ch != '\0');
         empty_cluster_first += fsize/cluster_size + ((fsize%cluster_size)? 1: 0);

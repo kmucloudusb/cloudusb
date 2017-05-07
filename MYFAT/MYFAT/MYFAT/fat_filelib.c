@@ -1603,8 +1603,14 @@ struct fatfs* fl_get_fs(void)
 #endif
 
 #if FATFS_INC_WRITE_SUPPORT
-FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, int dir)
+uint32 write_entry(char *filename, uint32 fsize, int dir)
 {
+    if(dir)
+    {
+        _create_directory(filename);
+        return 1;
+    }
+    
     FL_FILE* file;
     struct fat_dir_entry sfEntry;
     char shortFilename[FAT_SFN_SIZE_FULL];
@@ -1612,12 +1618,12 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, in
     
     // No write access?
     if (!_fs.disk_io.write_media)
-        return NULL;
+        return 0;
     
     // Allocate a new file handle
     file = _allocate_file();
     if (!file)
-        return NULL;
+        return 0;
     
     // Clear filename
     memset(file->path, '\0', sizeof(file->path));
@@ -1627,14 +1633,14 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, in
     if (fatfs_split_path((char*)filename, file->path, sizeof(file->path), file->filename, sizeof(file->filename)) == -1)
     {
         _free_file(file);
-        return NULL;
+        return 0;
     }
     
     // Check if file already open
     if (_check_file_open(file))
     {
         _free_file(file);
-        return NULL;
+        return 0;
     }
     
     // If file is in the root dir
@@ -1646,7 +1652,7 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, in
         if (!_open_directory(file->path, &file->parentcluster))
         {
             _free_file(file);
-            return NULL;
+            return 0;
         }
     }
     
@@ -1654,17 +1660,17 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, in
     if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename,&sfEntry) == 1)
     {
         _free_file(file);
-        return NULL;
+        return 0;
     }
     
-    file->startcluster = startcluster;
+    file->startcluster = 0;
     
-    //    // Create the file space for the file (at least one clusters worth!)
-    //    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, 1))
-    //    {
-    //        _free_file(file);
-    //        return NULL;
-    //    }
+    // Create the file space for the file (at least one clusters worth!)
+    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, 1))
+    {
+        _free_file(file);
+        return 0;
+    }
     
 #if FATFS_INC_LFN_SUPPORT
     // Generate a short filename & tail
@@ -1696,7 +1702,7 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, in
         fatfs_free_cluster_chain(&_fs, file->startcluster);
         
         _free_file(file);
-        return NULL;
+        return 0;
     }
 #else
     // Create a standard short filename (without tail)
@@ -1706,7 +1712,7 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, in
         fatfs_free_cluster_chain(&_fs, file->startcluster);
         
         _free_file(file);
-        return NULL;
+        return 0;
     }
     
     // Copy to SFN space
@@ -1719,18 +1725,18 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, in
         fatfs_free_cluster_chain(&_fs, file->startcluster);
         
         _free_file(file);
-        return NULL;
+        return 0;
     }
 #endif
     
     // Add file to disk
-    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, fsize, dir))
+    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, fsize, 0))
     {
         // Delete allocated space
         fatfs_free_cluster_chain(&_fs, file->startcluster);
         
         _free_file(file);
-        return NULL;
+        return 0;
     }
     
     // General
@@ -1748,6 +1754,8 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, in
     
     fatfs_fat_purge(&_fs);
     
-    return file;
+    _free_file(file);
+    
+    return 1;
 }
 #endif

@@ -41,7 +41,7 @@ void create_image();
 void download_metadata();
 void read_pipe(char *buffer);
 void make_alloc_table(unsigned long table_num, uint32 start_cluster, uint32 fsize, char *fileid);
-void write_metadata(char *filename, uint32 fsize, uint32 startcluster, int dir);
+uint32 write_metadata(char *filename, uint32 fsize, int dir);
 void make_metadata();
 int download_from_g_drive(char *fileid);
 int read_file(int fd, uint32 sector, uint32 *buffer, uint32 sector_count);
