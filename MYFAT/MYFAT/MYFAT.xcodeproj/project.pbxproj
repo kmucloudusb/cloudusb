@@ -7,8 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AE9430D71E52A171003AFB75 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9430D61E52A171003AFB75 /* main.c */; };
-		AE9430E61E52AE06003AFB75 /* fat_string.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9430E41E52AE06003AFB75 /* fat_string.c */; };
+		AE9D3C211EBF107E00A3FC1D /* fat_access.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C0B1EBF107E00A3FC1D /* fat_access.c */; };
+		AE9D3C221EBF107E00A3FC1D /* fat_cache.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C0D1EBF107E00A3FC1D /* fat_cache.c */; };
+		AE9D3C231EBF107E00A3FC1D /* fat_custom.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C0F1EBF107E00A3FC1D /* fat_custom.c */; };
+		AE9D3C241EBF107E00A3FC1D /* fat_filelib.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C121EBF107E00A3FC1D /* fat_filelib.c */; };
+		AE9D3C251EBF107E00A3FC1D /* fat_format.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C141EBF107E00A3FC1D /* fat_format.c */; };
+		AE9D3C261EBF107E00A3FC1D /* fat_misc.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C171EBF107E00A3FC1D /* fat_misc.c */; };
+		AE9D3C271EBF107E00A3FC1D /* fat_string.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C1A1EBF107E00A3FC1D /* fat_string.c */; };
+		AE9D3C281EBF107E00A3FC1D /* fat_table.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C1C1EBF107E00A3FC1D /* fat_table.c */; };
+		AE9D3C291EBF107E00A3FC1D /* fat_write.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C1F1EBF107E00A3FC1D /* fat_write.c */; };
+		AE9D3C2B1EBF108600A3FC1D /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C2A1EBF108600A3FC1D /* main.c */; };
+		AE9D3C2D1EBF109100A3FC1D /* Makefile in Sources */ = {isa = PBXBuildFile; fileRef = AE9D3C2C1EBF109100A3FC1D /* Makefile */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,13 +34,30 @@
 
 /* Begin PBXFileReference section */
 		AE9430D31E52A171003AFB75 /* MYFAT */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MYFAT; sourceTree = BUILT_PRODUCTS_DIR; };
-		AE9430D61E52A171003AFB75 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
-		AE9430DD1E52A22D003AFB75 /* header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = header.h; sourceTree = "<group>"; };
-		AE9430DE1E52A2F3003AFB75 /* fat_defs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fat_defs.h; sourceTree = "<group>"; };
-		AE9430DF1E52A2F3003AFB75 /* fat_opts.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fat_opts.h; sourceTree = "<group>"; };
-		AE9430E01E52A2FA003AFB75 /* fat_types.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fat_types.h; sourceTree = "<group>"; };
-		AE9430E41E52AE06003AFB75 /* fat_string.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_string.c; sourceTree = "<group>"; };
-		AE9430E51E52AE06003AFB75 /* fat_string.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_string.h; sourceTree = "<group>"; };
+		AE9D3C0B1EBF107E00A3FC1D /* fat_access.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_access.c; sourceTree = "<group>"; };
+		AE9D3C0C1EBF107E00A3FC1D /* fat_access.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_access.h; sourceTree = "<group>"; };
+		AE9D3C0D1EBF107E00A3FC1D /* fat_cache.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_cache.c; sourceTree = "<group>"; };
+		AE9D3C0E1EBF107E00A3FC1D /* fat_cache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_cache.h; sourceTree = "<group>"; };
+		AE9D3C0F1EBF107E00A3FC1D /* fat_custom.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_custom.c; sourceTree = "<group>"; };
+		AE9D3C101EBF107E00A3FC1D /* fat_custom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_custom.h; sourceTree = "<group>"; };
+		AE9D3C111EBF107E00A3FC1D /* fat_defs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_defs.h; sourceTree = "<group>"; };
+		AE9D3C121EBF107E00A3FC1D /* fat_filelib.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_filelib.c; sourceTree = "<group>"; };
+		AE9D3C131EBF107E00A3FC1D /* fat_filelib.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_filelib.h; sourceTree = "<group>"; };
+		AE9D3C141EBF107E00A3FC1D /* fat_format.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_format.c; sourceTree = "<group>"; };
+		AE9D3C151EBF107E00A3FC1D /* fat_format.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_format.h; sourceTree = "<group>"; };
+		AE9D3C161EBF107E00A3FC1D /* fat_list.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_list.h; sourceTree = "<group>"; };
+		AE9D3C171EBF107E00A3FC1D /* fat_misc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_misc.c; sourceTree = "<group>"; };
+		AE9D3C181EBF107E00A3FC1D /* fat_misc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_misc.h; sourceTree = "<group>"; };
+		AE9D3C191EBF107E00A3FC1D /* fat_opts.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_opts.h; sourceTree = "<group>"; };
+		AE9D3C1A1EBF107E00A3FC1D /* fat_string.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_string.c; sourceTree = "<group>"; };
+		AE9D3C1B1EBF107E00A3FC1D /* fat_string.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_string.h; sourceTree = "<group>"; };
+		AE9D3C1C1EBF107E00A3FC1D /* fat_table.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_table.c; sourceTree = "<group>"; };
+		AE9D3C1D1EBF107E00A3FC1D /* fat_table.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_table.h; sourceTree = "<group>"; };
+		AE9D3C1E1EBF107E00A3FC1D /* fat_types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_types.h; sourceTree = "<group>"; };
+		AE9D3C1F1EBF107E00A3FC1D /* fat_write.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fat_write.c; sourceTree = "<group>"; };
+		AE9D3C201EBF107E00A3FC1D /* fat_write.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fat_write.h; sourceTree = "<group>"; };
+		AE9D3C2A1EBF108600A3FC1D /* main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		AE9D3C2C1EBF109100A3FC1D /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,13 +90,30 @@
 		AE9430D51E52A171003AFB75 /* MYFAT */ = {
 			isa = PBXGroup;
 			children = (
-				AE9430D61E52A171003AFB75 /* main.c */,
-				AE9430DD1E52A22D003AFB75 /* header.h */,
-				AE9430DE1E52A2F3003AFB75 /* fat_defs.h */,
-				AE9430DF1E52A2F3003AFB75 /* fat_opts.h */,
-				AE9430E01E52A2FA003AFB75 /* fat_types.h */,
-				AE9430E41E52AE06003AFB75 /* fat_string.c */,
-				AE9430E51E52AE06003AFB75 /* fat_string.h */,
+				AE9D3C2A1EBF108600A3FC1D /* main.c */,
+				AE9D3C0B1EBF107E00A3FC1D /* fat_access.c */,
+				AE9D3C0C1EBF107E00A3FC1D /* fat_access.h */,
+				AE9D3C0D1EBF107E00A3FC1D /* fat_cache.c */,
+				AE9D3C0E1EBF107E00A3FC1D /* fat_cache.h */,
+				AE9D3C0F1EBF107E00A3FC1D /* fat_custom.c */,
+				AE9D3C101EBF107E00A3FC1D /* fat_custom.h */,
+				AE9D3C111EBF107E00A3FC1D /* fat_defs.h */,
+				AE9D3C121EBF107E00A3FC1D /* fat_filelib.c */,
+				AE9D3C131EBF107E00A3FC1D /* fat_filelib.h */,
+				AE9D3C141EBF107E00A3FC1D /* fat_format.c */,
+				AE9D3C151EBF107E00A3FC1D /* fat_format.h */,
+				AE9D3C161EBF107E00A3FC1D /* fat_list.h */,
+				AE9D3C171EBF107E00A3FC1D /* fat_misc.c */,
+				AE9D3C181EBF107E00A3FC1D /* fat_misc.h */,
+				AE9D3C191EBF107E00A3FC1D /* fat_opts.h */,
+				AE9D3C1A1EBF107E00A3FC1D /* fat_string.c */,
+				AE9D3C1B1EBF107E00A3FC1D /* fat_string.h */,
+				AE9D3C1C1EBF107E00A3FC1D /* fat_table.c */,
+				AE9D3C1D1EBF107E00A3FC1D /* fat_table.h */,
+				AE9D3C1E1EBF107E00A3FC1D /* fat_types.h */,
+				AE9D3C1F1EBF107E00A3FC1D /* fat_write.c */,
+				AE9D3C201EBF107E00A3FC1D /* fat_write.h */,
+				AE9D3C2C1EBF109100A3FC1D /* Makefile */,
 			);
 			path = MYFAT;
 			sourceTree = "<group>";
@@ -132,8 +175,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AE9430E61E52AE06003AFB75 /* fat_string.c in Sources */,
-				AE9430D71E52A171003AFB75 /* main.c in Sources */,
+				AE9D3C2B1EBF108600A3FC1D /* main.c in Sources */,
+				AE9D3C231EBF107E00A3FC1D /* fat_custom.c in Sources */,
+				AE9D3C221EBF107E00A3FC1D /* fat_cache.c in Sources */,
+				AE9D3C2D1EBF109100A3FC1D /* Makefile in Sources */,
+				AE9D3C211EBF107E00A3FC1D /* fat_access.c in Sources */,
+				AE9D3C291EBF107E00A3FC1D /* fat_write.c in Sources */,
+				AE9D3C241EBF107E00A3FC1D /* fat_filelib.c in Sources */,
+				AE9D3C271EBF107E00A3FC1D /* fat_string.c in Sources */,
+				AE9D3C251EBF107E00A3FC1D /* fat_format.c in Sources */,
+				AE9D3C281EBF107E00A3FC1D /* fat_table.c in Sources */,
+				AE9D3C261EBF107E00A3FC1D /* fat_misc.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
