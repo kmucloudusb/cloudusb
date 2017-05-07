@@ -143,9 +143,9 @@ void make_alloc_table(unsigned long table_num, uint32 start_cluster, uint32 fsiz
     strcpy(_table[table_num].fileid, fileid);
 }
 
-void write_metadata(char *filename, uint32 fsize, uint32 startcluster)
+void write_metadata(char *filename, uint32 fsize, uint32 startcluster, int dir)
 {
-    fl_fclose(write_entry(filename, fsize, startcluster));
+    fl_fclose(write_entry(filename, fsize, startcluster, dir));
 }
 
 void make_metadata()
@@ -159,6 +159,7 @@ void make_metadata()
     char filename[FAT_SFN_SIZE_FULL];
     uint32 fsize;
     char fileid[FILE_ID_LEN_FULL];
+    int dir;
     
     uint32 empty_cluster_first = 6;
     uint32 cluster_size = 512 * _fs.sectors_per_cluster;
@@ -167,10 +168,10 @@ void make_metadata()
     
     while(ch != '\0')
     {
-        sscanf(filelist+offset, "%s %u %s", filename, &fsize, fileid);
+        sscanf(filelist+offset, "%s %u %s %d", filename, &fsize, fileid, &dir);
         
         make_alloc_table(table_num++, empty_cluster_first, fsize, fileid);
-        write_metadata(filename, fsize, empty_cluster_first);
+        write_metadata(filename, fsize, empty_cluster_first, dir);
         
         while((ch = *(filelist+(offset++))) != '\n' && ch != '\0');
         empty_cluster_first += fsize/cluster_size + ((fsize%cluster_size)? 1: 0);

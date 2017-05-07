@@ -1603,7 +1603,7 @@ struct fatfs* fl_get_fs(void)
 #endif
 
 #if FATFS_INC_WRITE_SUPPORT
-FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster)
+FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster, int dir)
 {
     FL_FILE* file;
     struct fat_dir_entry sfEntry;
@@ -1724,7 +1724,7 @@ FL_FILE* write_entry(const char *filename, uint32 fsize, uint32 startcluster)
 #endif
     
     // Add file to disk
-    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, fsize, 0))
+    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, fsize, dir))
     {
         // Delete allocated space
         fatfs_free_cluster_chain(&_fs, file->startcluster);
