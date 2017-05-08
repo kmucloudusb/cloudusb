@@ -12,18 +12,17 @@ from oauth2client import tools
 from oauth2client.file import Storage
 from apiclient.http import MediaIoBaseDownload
 
-
-PIPE_PATH = ''
+file_id = ''
 
 try:
     import argparse
-
-    tools.argparser.add_argument('--path', default='./../myfifo', help='pipe path')
+    
+    tools.argparser.add_argument('--down', default='-1', help='file id')
 
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
 
-    if flags.path:
-        PIPE_PATH = flags.path
+    if flags.down:
+        file_id = flags.down
 
 except ImportError:
     flags = None
@@ -70,9 +69,6 @@ def main():
     service = discovery.build('drive', 'v3', http=http)
 
     ## 파일 다운로드
-
-    # 파일 id
-    file_id = '0B8CPvjgKUMvtM2tTWTctVzNrUm8'
 
     # 파일 size
     drive_file = service.files().get(fileId=file_id, fields='size').execute()
