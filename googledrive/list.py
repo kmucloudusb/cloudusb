@@ -94,11 +94,6 @@ def main():
     del result_directories[0]
 
     # 3. 탐색한 파일, 디렉토리 정보를 보여줌
-    print("1. directories list")
-    for path in result_directories:
-        print(path)
-    print()
-    print("2. files list")
     for file in result_files:
         print(file)
 
@@ -133,11 +128,11 @@ def listing_files(service, folderID, directory, result_files, result_directories
     else:
         for item in items:
             if item['mimeType'] == FOLDER:
-                result_files.append('%s %s' % (directory + '/' + item['name'], "d"))
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "0", "1", "0"))
                 listing_files(service, item['id'], directory + "/%s" % item['name'], result_files, result_directories)
             else:
 
-                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "f", item['size'] ,item['id']))
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "1", item['size'] ,item['id']))
 
 
 if __name__ == '__main__':

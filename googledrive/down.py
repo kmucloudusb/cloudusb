@@ -72,7 +72,7 @@ def main():
     ## 파일 다운로드
 
     # 파일 id
-    file_id = '0B8CPvjgKUMvtVGxGZHBCaWVabVk'
+    file_id = '0B8CPvjgKUMvtM2tTWTctVzNrUm8'
 
     # 파일 size
     drive_file = service.files().get(fileId=file_id, fields='size').execute()
