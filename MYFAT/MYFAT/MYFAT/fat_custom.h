@@ -44,7 +44,7 @@ void make_alloc_table(unsigned long table_num, uint32 start_cluster, uint32 fsiz
 uint32 write_metadata(char *filename, uint32 fsize, int dir);
 void make_metadata();
 int download_from_g_drive(char *fileid);
-int read_file(int fd, uint32 sector, uint32 *buffer, uint32 sector_count);
-void ans_request(uint32 offset, uint32 *buffer, uint32 offset_count);
+int read_file(int fd, uint32 sector, unsigned char *buffer, uint32 sector_count);
+void ans_request(uint32 offset, unsigned char *buffer, uint32 offset_count);
 
 #endif /* fat_custom_h */

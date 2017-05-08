@@ -121,8 +121,6 @@ void download_metadata()
     strcat(cmd, " --path ");
     strcat(cmd, _pipe_path);
     system(cmd);
-    
-    download_from_g_drive("0BxY2hmExp4VYSmpOLXF6LTN5YnM");
 }
 
 // input : <filename, filesize, fileid, isdir>
@@ -201,7 +199,7 @@ int download_from_g_drive(char *fileid)
     return -1;
 }
 
-int read_file(int fd, uint32 sector, uint32 *buffer, uint32 sector_count)
+int read_file(int fd, uint32 sector, unsigned char *buffer, uint32 sector_count)
 {
     lseek(fd, 512*sector, SEEK_SET);
     
@@ -214,18 +212,14 @@ int read_file(int fd, uint32 sector, uint32 *buffer, uint32 sector_count)
     return 1;
 }
 
-void ans_request(uint32 offset, uint32 *buffer, uint32 offset_count)
+void ans_request(uint32 offset, unsigned char *buffer, uint32 offset_count)
 {
     int i;
     int fd = -1;
     
     uint32 cluster = (((offset/FAT_SECTOR_SIZE) - (_fs.rootdir_first_sector))/_fs.sectors_per_cluster) - _fs.rootdir_first_cluster;
     
-    if(!cluster)
-    {
-        read_image(offset/FAT_SECTOR_SIZE, buffer, offset_count/FAT_SECTOR_SIZE);
-    }
-    
+    int intable = 1;
     for(i=0; i<_table_size; ++i)
         if(_table[i].start_cluster <= cluster && cluster < _table[i].size)
         {
@@ -233,5 +227,8 @@ void ans_request(uint32 offset, uint32 *buffer, uint32 offset_count)
             break;
         }
     
-    read_file(fd, (cluster - _table[i].start_cluster) * _fs.sectors_per_cluster, buffer, offset_count/FAT_SECTOR_SIZE);
+    if(intable)
+        read_file(fd, (cluster - _table[i].start_cluster) * _fs.sectors_per_cluster, buffer, offset_count/FAT_SECTOR_SIZE);
+    else
+        read_image(offset/FAT_SECTOR_SIZE, buffer, offset_count/FAT_SECTOR_SIZE);
 }
