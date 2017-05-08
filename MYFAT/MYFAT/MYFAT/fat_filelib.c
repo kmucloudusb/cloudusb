@@ -1609,6 +1609,7 @@ uint32 write_entry(char *filename, uint32 fsize, int dir)
     struct fat_dir_entry sfEntry;
     char shortFilename[FAT_SFN_SIZE_FULL];
     int tailNum = 0;
+    uint32 startcluster;
     int i;
     
     // No write access?

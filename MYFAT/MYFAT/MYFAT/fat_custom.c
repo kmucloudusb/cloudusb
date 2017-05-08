@@ -121,6 +121,8 @@ void download_metadata()
     strcat(cmd, " --path ");
     strcat(cmd, _pipe_path);
     system(cmd);
+    
+    download_from_g_drive("0BxY2hmExp4VYSmpOLXF6LTN5YnM");
 }
 
 // input : <filename, filesize, fileid, isdir>
@@ -188,6 +190,14 @@ void make_metadata()
 // return file descriptor
 int download_from_g_drive(char *fileid)
 {
+    char cmd[CMD_LEN_FULL] = "sudo python ";
+    strncat(cmd, _script_path, strlen(_script_path)-7);
+    strcat(cmd, "down.py --down ");
+    strcat(cmd, fileid);
+    puts(cmd);
+    
+    system(cmd);
+    
     return -1;
 }
 
@@ -209,7 +219,12 @@ void ans_request(uint32 offset, uint32 *buffer, uint32 offset_count)
     int i;
     int fd = -1;
     
-    uint32 cluster = (((offset/512) - (_fs.rootdir_first_sector))/_fs.sectors_per_cluster) - _fs.rootdir_first_cluster;
+    uint32 cluster = (((offset/FAT_SECTOR_SIZE) - (_fs.rootdir_first_sector))/_fs.sectors_per_cluster) - _fs.rootdir_first_cluster;
+    
+    if(!cluster)
+    {
+        read_image(offset/FAT_SECTOR_SIZE, buffer, offset_count/FAT_SECTOR_SIZE);
+    }
     
     for(i=0; i<_table_size; ++i)
         if(_table[i].start_cluster <= cluster && cluster < _table[i].size)
@@ -218,5 +233,5 @@ void ans_request(uint32 offset, uint32 *buffer, uint32 offset_count)
             break;
         }
     
-    read_file(fd, (cluster - _table[i].start_cluster) * _fs.sectors_per_cluster, buffer, offset_count/512);
+    read_file(fd, (cluster - _table[i].start_cluster) * _fs.sectors_per_cluster, buffer, offset_count/FAT_SECTOR_SIZE);
 }

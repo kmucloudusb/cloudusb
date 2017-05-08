@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
     read_path(argv[0]);
     
     // Create FAT32 image file (1GB)
-    create_image();
+//    create_image();
     
     // Open image file
     open_image();
