@@ -105,8 +105,7 @@ def main():
             raise exc
         pass
 
-    #fifo = open(PIPE_PATH, "w")    
-    fifo = open('pipe.txt', "w")
+    fifo = open(PIPE_PATH, "w")    
     try:
         for file in result_files:
             fifo.write(file + "\n")
@@ -128,12 +127,11 @@ def listing_files(service, folderID, directory, result_files, result_directories
     else:
         for item in items:
             if item['mimeType'] == FOLDER:
-                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "0", "1", "0"))
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "1", "0", "1"))
                 listing_files(service, item['id'], directory + "/%s" % item['name'], result_files, result_directories)
             else:
 
-                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "1", item['size'] ,item['id']))
-
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], item['size'] ,item['id'], '1'))
 
 if __name__ == '__main__':
     main()

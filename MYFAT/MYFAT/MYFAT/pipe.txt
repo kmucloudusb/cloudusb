@@ -1,3 +1,0 @@
-/aaa.txt 4 0BxY2hmExp4VYSmpOLXF6LTN5YnM 1
-/bbb.txt 3 0BxY2hmExp4VYMkMzLTUtdUJQYzA 1
-/test3.txt 4 0BxY2hmExp4VYN0M2b1NGUnJZQzQ 1
