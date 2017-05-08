@@ -1605,16 +1605,11 @@ struct fatfs* fl_get_fs(void)
 #if FATFS_INC_WRITE_SUPPORT
 uint32 write_entry(char *filename, uint32 fsize, int dir)
 {
-    if(dir)
-    {
-        _create_directory(filename);
-        return 1;
-    }
-    
     FL_FILE* file;
     struct fat_dir_entry sfEntry;
     char shortFilename[FAT_SFN_SIZE_FULL];
     int tailNum = 0;
+    int i;
     
     // No write access?
     if (!_fs.disk_io.write_media)
@@ -1666,10 +1661,24 @@ uint32 write_entry(char *filename, uint32 fsize, int dir)
     file->startcluster = 0;
     
     // Create the file space for the file (at least one clusters worth!)
-    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, 1))
+    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, fsize))
     {
         _free_file(file);
         return 0;
+    }
+    
+    // Erase new directory cluster
+    if (dir)
+    {
+        memset(file->file_data_sector, 0x00, FAT_SECTOR_SIZE);
+        for (i=0;i<_fs.sectors_per_cluster;i++)
+        {
+            if (!fatfs_write_sector(&_fs, file->startcluster, i, file->file_data_sector))
+            {
+                _free_file(file);
+                return 0;
+            }
+        }
     }
     
 #if FATFS_INC_LFN_SUPPORT
@@ -1730,7 +1739,7 @@ uint32 write_entry(char *filename, uint32 fsize, int dir)
 #endif
     
     // Add file to disk
-    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, fsize, 0))
+    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, fsize, dir))
     {
         // Delete allocated space
         fatfs_free_cluster_chain(&_fs, file->startcluster);
@@ -1754,8 +1763,9 @@ uint32 write_entry(char *filename, uint32 fsize, int dir)
     
     fatfs_fat_purge(&_fs);
     
+    startcluster = file->startcluster;
     _free_file(file);
     
-    return 1;
+    return startcluster;
 }
 #endif
