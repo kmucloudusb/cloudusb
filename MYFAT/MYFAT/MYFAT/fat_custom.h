@@ -25,7 +25,7 @@
 struct direntry
 {
     uint32 cluster;
-    unsigned char *data;
+    unsigned char data[4096];
 };
 
 struct dataentry
@@ -38,43 +38,13 @@ struct dataentry
 //-----------------------------------------------------------------------------
 // Prototypes
 //-----------------------------------------------------------------------------
-//
-//  fat_custom.c
-//  revolution
-//
-//  Created by Hanul on 01/05/2017.
-//  Copyright © 2017 Hanul. All rights reserved.
-//
+//void _profile();
 
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include "fat_filelib.h"
-#include "fat_types.h"
-#include "fat_custom.h"
-
-//-----------------------------------------------------------------------------
-// Locals
-//-----------------------------------------------------------------------------
-static unsigned char _reserved[1024];
-static unsigned char _fat[1024];
-
-static struct direntry *_direntries[DIR_ENTRY_TABLE_FULL];
-static struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
-
-extern struct fatfs _fs;
-
-static char _script_path[PATH_LEN_FULL];
-static char _pipe_path[PATH_LEN_FULL];
-
-//-----------------------------------------------------------------------------
-// Functions
-//-----------------------------------------------------------------------------
 void read_path(char *exec_path);
 
 void create_boot_record();
 void create_fat();
+void create_rootdir_entry();
 
 int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count);
 int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count);

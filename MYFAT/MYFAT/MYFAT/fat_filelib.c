@@ -1669,23 +1669,23 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
         return 0;
     }
     
-    // Erase new directory cluster
-    if (dir)
-    {
-        create_direntry(file->startcluster);
-        
-        memset(file->file_data_sector, 0x00, FAT_SECTOR_SIZE);
-        for (i=0;i<_fs.sectors_per_cluster;i++)
-        {
-            if (!fatfs_write_sector(&_fs, file->startcluster, i, file->file_data_sector))
-            {
-                _free_file(file);
-                return 0;
-            }
-        }
-    }
-    else
-        create_dataentry(file->startcluster, fsize, fid);
+//    // Erase new directory cluster
+//    if (dir)
+//    {
+//        create_direntry(file->startcluster);
+//        
+//        memset(file->file_data_sector, 0x00, FAT_SECTOR_SIZE);
+//        for (i=0;i<_fs.sectors_per_cluster;i++)
+//        {
+//            if (!fatfs_write_sector(&_fs, file->startcluster, i, file->file_data_sector))
+//            {
+//                _free_file(file);
+//                return 0;
+//            }
+//        }
+//    }
+//    else
+//        create_dataentry(file->startcluster, fsize, fid);
     
 #if FATFS_INC_LFN_SUPPORT
     // Generate a short filename & tail

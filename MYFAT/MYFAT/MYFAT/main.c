@@ -23,13 +23,14 @@ int main(int argc, char *argv[])
         return 1;
     }
     
+    create_rootdir_entry();
+    
     // Download metadata from google drive
     download_metadata();
     
     // Make table
     write_entries();
     
-    // List root directory
     fl_listdirectory("/");
     
     fl_shutdown();

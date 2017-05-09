@@ -20,8 +20,8 @@
 static unsigned char _reserved[1024];
 static unsigned char _fat[1024];
 
-static struct direntry *_direntries[DIR_ENTRY_TABLE_FULL];
-static struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
+struct direntry *_direntries[DIR_ENTRY_TABLE_FULL];
+struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
 
 extern struct fatfs _fs;
 
@@ -31,8 +31,41 @@ static char _pipe_path[PATH_LEN_FULL];
 //-----------------------------------------------------------------------------
 // Functions
 //-----------------------------------------------------------------------------
-void create_boot_record(){
-    
+//void _profile()
+//{
+//    puts("=== FAT AREA ===");
+//    for(int i=0; i<128; i+=2)
+//        if(i % 16 == 0)
+//            printf("\n%02X", _fat[i]);
+//        else
+//            printf("%02X ", _fat[i]);
+//    
+//    puts("\n\n=== ROOT DIR ENTRY ===");
+//    for(int i=0; i<128; i+=2)
+//        if(i % 16 == 0)
+//            printf("\n%02X", _direntries[0]->data[i]);
+//        else
+//            printf("%02X ", _direntries[0]->data[i]);
+//}
+//void printFS(){
+//    int i = 0;
+//    printf("%d : %u\n", _fs.sectors_per_cluster);
+//    printf("%d : %u\n", _fs.cluster_begin_lba);
+//    printf("%d : %u\n", _fs.rootdir_first_cluster);
+//    printf("%d : %u\n", _fs.rootdir_first_sector);
+//    printf("%d : %u\n", _fs.fat_begin_lba);
+//    printf("%d : %u\n", _fs.fs_info_sector);
+//    printf("%d : %u\n", _fs.lba_begin);
+//    printf("%d : %u\n", _fs.fat_sectors);
+//    printf("%d : %u\n", _fs.next_free_cluster);
+//    printf("%d : %u\n", _fs.root_entry_count);
+//    printf("%d : %u\n", _fs.reserved_sectors);
+//    printf("%d : %u\n", _fs.num_of_fats);
+//    printf("%d : %u\n", _fs.fat_type);
+//}
+
+void create_boot_record()
+{
     // ~1024 Byte
     unsigned char reserved[] =
     {
@@ -178,39 +211,10 @@ void create_fat()
     memcpy(_fat, fat, 1024);
 }
 
-//void make_fs()
-//{
-//    _fs.sectors_per_cluster = 8;
-//    _fs.cluster_begin_lba = 130850;
-//    _fs.rootdir_first_cluster = 2;
-//    _fs.rootdir_first_sector = 130850;
-//    _fs.fat_begin_lba = 32;
-//    _fs.fs_info_sector = 1;
-//    _fs.lba_begin = 0;
-//    _fs.fat_sectors = 65409;
-//    _fs.next_free_cluster = 0;
-//    _fs.root_entry_count = 0;
-//    _fs.reserved_sectors = 0;
-//    _fs.num_of_fats = 0;
-//    _fs.fat_type = 1;
-//}
-
-//void printFS(){
-//    int i = 0;
-//    printf("%d : %u\n", _fs.sectors_per_cluster);
-//    printf("%d : %u\n", _fs.cluster_begin_lba);
-//    printf("%d : %u\n", _fs.rootdir_first_cluster);
-//    printf("%d : %u\n", _fs.rootdir_first_sector);
-//    printf("%d : %u\n", _fs.fat_begin_lba);
-//    printf("%d : %u\n", _fs.fs_info_sector);
-//    printf("%d : %u\n", _fs.lba_begin);
-//    printf("%d : %u\n", _fs.fat_sectors);
-//    printf("%d : %u\n", _fs.next_free_cluster);
-//    printf("%d : %u\n", _fs.root_entry_count);
-//    printf("%d : %u\n", _fs.reserved_sectors);
-//    printf("%d : %u\n", _fs.num_of_fats);
-//    printf("%d : %u\n", _fs.fat_type);
-//}
+void create_rootdir_entry()
+{
+    create_direntry(_fs.rootdir_first_cluster);
+}
 
 int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count)
 {
@@ -273,8 +277,16 @@ int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sect
 
 int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count)
 {
+    // ~ 1024 Byte (Reserved area)
+    if((sector + sector_count)*FAT_SECTOR_SIZE <= 1024)
+    {
+        unsigned long loc = sector * FAT_SECTOR_SIZE;
+        
+        memcpy(_reserved + loc, buffer, sector_count * FAT_SECTOR_SIZE);
+    }
+    
     // ~ 13850 Sector (FAT area)
-    if(_fs.fat_begin_lba <= sector && sector < _fs.rootdir_first_sector)
+    else if(_fs.fat_begin_lba <= sector && sector < _fs.rootdir_first_sector)
     {
         unsigned long loc = (sector - _fs.fat_begin_lba) * FAT_SECTOR_SIZE;
         
@@ -318,11 +330,6 @@ int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sec
     return 1;
 }
 
-
-
-
-
-
 void read_path(char *exec_path)
 {
     strcpy(_script_path, exec_path);
@@ -338,6 +345,7 @@ void download_metadata()
     strcat(cmd, _script_path);
     strcat(cmd, " --path ");
     strcat(cmd, _pipe_path);
+    
     system(cmd);
 }
 
@@ -363,7 +371,6 @@ int create_direntry(uint32 startcluster)
         if(_direntries[i] == NULL)
         {
             _direntries[i] = (struct direntry*)malloc(sizeof(struct direntry));
-            _direntries[i]->data = (unsigned char*)malloc(sizeof(unsigned char)*FAT_SECTOR_SIZE*_fs.sectors_per_cluster);
             
             memset(_direntries[i], 0x00, sizeof(unsigned char)*FAT_SECTOR_SIZE*_fs.sectors_per_cluster);
             
@@ -388,6 +395,7 @@ int create_dataentry(uint32 startcluster, uint32 fsize, char *fid)
             
             _dataentries[i]->startcluster = startcluster;
             _dataentries[i]->size = fsize;
+            
             memcpy(_dataentries[i]->id, fid, FILE_ID_LEN_FULL);
             
             return 1;
