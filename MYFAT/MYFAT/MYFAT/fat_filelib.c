@@ -39,6 +39,7 @@
 #include "fat_string.h"
 #include "fat_filelib.h"
 #include "fat_cache.h"
+#include "fat_custom.h"
 
 //-----------------------------------------------------------------------------
 // Locals
@@ -1603,7 +1604,7 @@ struct fatfs* fl_get_fs(void)
 #endif
 
 #if FATFS_INC_WRITE_SUPPORT
-uint32 write_entry(char *filename, uint32 fsize, int dir)
+uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
 {
     FL_FILE* file;
     struct fat_dir_entry sfEntry;
@@ -1671,6 +1672,8 @@ uint32 write_entry(char *filename, uint32 fsize, int dir)
     // Erase new directory cluster
     if (dir)
     {
+        create_direntry(file->startcluster);
+        
         memset(file->file_data_sector, 0x00, FAT_SECTOR_SIZE);
         for (i=0;i<_fs.sectors_per_cluster;i++)
         {
@@ -1681,6 +1684,8 @@ uint32 write_entry(char *filename, uint32 fsize, int dir)
             }
         }
     }
+    else
+        create_dataentry(file->startcluster, fsize, fid);
     
 #if FATFS_INC_LFN_SUPPORT
     // Generate a short filename & tail

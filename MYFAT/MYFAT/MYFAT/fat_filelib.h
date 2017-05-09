@@ -109,7 +109,7 @@ int                 fl_closedir(FL_DIR* dir);
 void                fl_listdirectory(const char *path);
 int                 fl_createdirectory(const char *path);
 int                 fl_is_dir(const char *path);
-uint32              write_entry(char *filename, uint32 fsize, int dir);
+uint32              write_entry(char *filename, uint32 fsize, char *fid, int dir);
 
 int                 fl_format(uint32 volume_sectors, const char *name);
 
