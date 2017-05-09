@@ -18,6 +18,8 @@
 #define DATA_ENTRY_TABLE_FULL 1024
 #define FILE_ID_LEN_FULL 65
 #define PIPE_LEN_FULL 1024*1024
+#define FAT_CLUSTER_SIZE 4096
+#define FAT_AREA_FULL 4096
 
 //-----------------------------------------------------------------------------
 // Structures
@@ -25,7 +27,7 @@
 struct direntry
 {
     uint32 cluster;
-    unsigned char data[4096];
+    unsigned char entry[FAT_CLUSTER_SIZE];
 };
 
 struct dataentry
@@ -38,8 +40,6 @@ struct dataentry
 //-----------------------------------------------------------------------------
 // Prototypes
 //-----------------------------------------------------------------------------
-//void _profile();
-
 void read_path(char *exec_path);
 
 void create_boot_record();
@@ -56,7 +56,7 @@ int create_direntry(uint32 startcluster);
 int create_dataentry(uint32 startcluster, uint32 fsize, char *fid);
 void write_entries();
 
-int download_file(char *fid);
+int download_file(char *fid, char *filename);
 int read_file(int fd, uint32 sector, unsigned char *buffer, uint32 sector_count);
 
 #endif /* fat_custom_h */

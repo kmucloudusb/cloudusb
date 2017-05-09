@@ -15,59 +15,39 @@
 #include "fat_custom.h"
 
 //-----------------------------------------------------------------------------
-// Locals
+// Globals
 //-----------------------------------------------------------------------------
-static unsigned char _reserved[1024];
-static unsigned char _fat[1024];
+extern struct fatfs _fs;
 
 struct direntry *_direntries[DIR_ENTRY_TABLE_FULL];
 struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
 
-extern struct fatfs _fs;
-
+//-----------------------------------------------------------------------------
+// Locals
+//-----------------------------------------------------------------------------
 static char _script_path[PATH_LEN_FULL];
 static char _pipe_path[PATH_LEN_FULL];
+
+static unsigned char _br[FAT_SECTOR_SIZE];
+static unsigned char _reserved_area_first[FAT_SECTOR_SIZE];
+static unsigned char _fat_area[FAT_AREA_FULL];
 
 //-----------------------------------------------------------------------------
 // Functions
 //-----------------------------------------------------------------------------
-//void _profile()
-//{
-//    puts("=== FAT AREA ===");
-//    for(int i=0; i<128; i+=2)
-//        if(i % 16 == 0)
-//            printf("\n%02X", _fat[i]);
-//        else
-//            printf("%02X ", _fat[i]);
-//    
-//    puts("\n\n=== ROOT DIR ENTRY ===");
-//    for(int i=0; i<128; i+=2)
-//        if(i % 16 == 0)
-//            printf("\n%02X", _direntries[0]->data[i]);
-//        else
-//            printf("%02X ", _direntries[0]->data[i]);
-//}
-//void printFS(){
-//    int i = 0;
-//    printf("%d : %u\n", _fs.sectors_per_cluster);
-//    printf("%d : %u\n", _fs.cluster_begin_lba);
-//    printf("%d : %u\n", _fs.rootdir_first_cluster);
-//    printf("%d : %u\n", _fs.rootdir_first_sector);
-//    printf("%d : %u\n", _fs.fat_begin_lba);
-//    printf("%d : %u\n", _fs.fs_info_sector);
-//    printf("%d : %u\n", _fs.lba_begin);
-//    printf("%d : %u\n", _fs.fat_sectors);
-//    printf("%d : %u\n", _fs.next_free_cluster);
-//    printf("%d : %u\n", _fs.root_entry_count);
-//    printf("%d : %u\n", _fs.reserved_sectors);
-//    printf("%d : %u\n", _fs.num_of_fats);
-//    printf("%d : %u\n", _fs.fat_type);
-//}
+void read_path(char *exec_path)
+{
+    strcpy(_script_path, exec_path);
+    strcpy(_pipe_path, exec_path);
+    
+    strcpy(&(_script_path[strlen(_script_path)-8]), "../../../googledrive/list.py");
+    strcpy(&(_pipe_path[strlen(_pipe_path)-8]), "../../../myfifo");
+}
 
 void create_boot_record()
 {
     // ~1024 Byte
-    unsigned char reserved[] =
+    unsigned char br[] =
     {
         0xEB, 0x58, 0x90, 0x6D, 0x6B, 0x66, 0x73, 0x2E, 0x66, 0x61, 0x74, 0x00, 0x02, 0x08, 0x20, 0x00,
         0x02, 0x00, 0x00, 0x00, 0x00, 0xF8, 0x00, 0x00, 0x20, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -100,7 +80,11 @@ void create_boot_record()
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x55, 0xAA,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x55, 0xAA
+    };
+    
+    unsigned char reserved[] =
+    {
         0x52, 0x52, 0x61, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -135,7 +119,8 @@ void create_boot_record()
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x55, 0xAA
     };
     
-    memcpy(_reserved, reserved, 1024);
+    memcpy(_br, br, FAT_SECTOR_SIZE);
+    memcpy(_reserved_area_first, reserved, FAT_SECTOR_SIZE);
 }
 
 void create_fat()
@@ -208,7 +193,7 @@ void create_fat()
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     };
     
-    memcpy(_fat, fat, 1024);
+    memcpy(_fat_area, fat, 1024);
 }
 
 void create_rootdir_entry()
@@ -218,12 +203,16 @@ void create_rootdir_entry()
 
 int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count)
 {
-    // ~ 1024 Byte (Reserved area)
-    if((sector + sector_count)*FAT_SECTOR_SIZE <= 1024)
+    // ~512 Byte (Boot record)
+    if(sector == 0 && sector_count == 1)
     {
-        unsigned long loc = sector * FAT_SECTOR_SIZE;
-        
-        memcpy(buffer, _reserved + loc, sector_count * FAT_SECTOR_SIZE);
+        memcpy(buffer, _br, FAT_SECTOR_SIZE);
+    }
+    
+    // ~ 1024 Byte (First sector of reserved area)
+    else if(sector == 1 && sector_count == 1)
+    {
+        memcpy(buffer, _reserved_area_first, FAT_SECTOR_SIZE);
     }
     
     // ~ 13850 Sector (FAT area)
@@ -231,7 +220,7 @@ int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sect
     {
         unsigned long loc = (sector - _fs.fat_begin_lba) * FAT_SECTOR_SIZE;
         
-        memcpy(buffer, _fat + loc, sector_count * FAT_SECTOR_SIZE);
+        memcpy(buffer, _fat_area + loc, sector_count * FAT_SECTOR_SIZE);
     }
     
     // Root directory first sector ~ (Directory entry)
@@ -251,7 +240,8 @@ int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sect
             
             if(_direntries[i]->cluster == cluster)
             {
-                memcpy(buffer, _direntries[i]->data + loc, sector_count * FAT_SECTOR_SIZE);
+                memcpy(buffer, _direntries[i]->entry + loc, sector_count * FAT_SECTOR_SIZE);
+                
                 return 1;
             }
         }
@@ -278,11 +268,9 @@ int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sect
 int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count)
 {
     // ~ 1024 Byte (Reserved area)
-    if((sector + sector_count)*FAT_SECTOR_SIZE <= 1024)
+    if(sector == 1 && sector_count == 1)
     {
-        unsigned long loc = sector * FAT_SECTOR_SIZE;
-        
-        memcpy(_reserved + loc, buffer, sector_count * FAT_SECTOR_SIZE);
+        memcpy(_reserved_area_first, buffer, FAT_SECTOR_SIZE);
     }
     
     // ~ 13850 Sector (FAT area)
@@ -290,7 +278,7 @@ int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sec
     {
         unsigned long loc = (sector - _fs.fat_begin_lba) * FAT_SECTOR_SIZE;
         
-        memcpy(_fat + loc, buffer, sector_count * FAT_SECTOR_SIZE);
+        memcpy(_fat_area + loc, buffer, sector_count * FAT_SECTOR_SIZE);
     }
     
     // Root directory first sector ~ (Directory entry)
@@ -310,7 +298,7 @@ int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sec
             
             if(_direntries[i]->cluster == cluster)
             {
-                memcpy(_direntries[i]->data + loc, buffer, sector_count * FAT_SECTOR_SIZE);
+                memcpy(_direntries[i]->entry + loc, buffer, sector_count * FAT_SECTOR_SIZE);
                 
                 return 1;
             }
@@ -328,15 +316,6 @@ int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sec
     }
     
     return 1;
-}
-
-void read_path(char *exec_path)
-{
-    strcpy(_script_path, exec_path);
-    strcpy(_pipe_path, exec_path);
-    
-    strcpy(&(_script_path[strlen(_script_path)-8]), "../../../googledrive/list.py");
-    strcpy(&(_pipe_path[strlen(_pipe_path)-8]), "../../../myfifo");
 }
 
 void download_metadata()
@@ -430,7 +409,7 @@ void write_entries()
 
 // download from google drive by file ID
 // return file descriptor
-int download_file(char *fid)
+int download_file(char *fid, char *filename)
 {
     char cmd[CMD_LEN_FULL] = "sudo python ";
     strncat(cmd, _script_path, strlen(_script_path)-7);
@@ -438,6 +417,8 @@ int download_file(char *fid)
     strcat(cmd, fid);
     
     system(cmd);
+    
+    return open(filename, O_RDONLY);
     
     return 1;
 }

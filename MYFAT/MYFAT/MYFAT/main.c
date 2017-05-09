@@ -10,7 +10,10 @@ int main(int argc, char *argv[])
     // Read paths to image, script, pipe
     read_path(argv[0]);
     
+    // Create boot record area
     create_boot_record();
+    
+    // Create fat area
     create_fat();
     
     // Initialise File IO Library
@@ -23,6 +26,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     
+    // Create root directory entry
     create_rootdir_entry();
     
     // Download metadata from google drive
