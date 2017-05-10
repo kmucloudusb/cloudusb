@@ -46,8 +46,8 @@ void create_boot_record();
 void create_fat();
 void create_rootdir_entry();
 
-int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count);
-int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count);
+int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count);
+int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count);
 
 void download_metadata();
 void read_pipe(char *buffer);
@@ -56,7 +56,7 @@ int create_direntry(uint32 startcluster);
 int create_dataentry(uint32 startcluster, uint32 fsize, char *fid);
 void write_entries();
 
-int download_file(char *fid, char *filename);
-int read_file(int fd, uint32 sector, unsigned char *buffer, uint32 sector_count);
+int download_file(char *fid);
+int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count);
 
 #endif /* fat_custom_h */

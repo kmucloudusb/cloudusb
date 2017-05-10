@@ -201,7 +201,7 @@ void create_rootdir_entry()
     create_direntry(_fs.rootdir_first_cluster);
 }
 
-int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count)
+int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
 {
     // ~512 Byte (Boot record)
     if(sector == 0 && sector_count == 1)
@@ -228,8 +228,6 @@ int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sect
     {
         unsigned long i;
         
-        // location on cluster
-        unsigned long loc = ((sector - _fs.rootdir_first_sector) % _fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
         unsigned long cluster = (sector - _fs.rootdir_first_sector)/_fs.sectors_per_cluster + _fs.rootdir_first_cluster;
         
         // Fine on directory entry cluster table
@@ -240,6 +238,8 @@ int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sect
             
             if(_direntries[i]->cluster == cluster)
             {
+                unsigned long loc = ((sector - _fs.rootdir_first_sector) % _fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
+                
                 memcpy(buffer, _direntries[i]->entry + loc, sector_count * FAT_SECTOR_SIZE);
                 
                 return 1;
@@ -252,12 +252,21 @@ int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sect
             if(_dataentries[i] == NULL)
                 break;
             
-            if(_dataentries[i]->startcluster == cluster)
+            uint32 size = _dataentries[i]->size;
+            uint32 endcluster = _dataentries[i]->startcluster + size/FAT_CLUSTER_SIZE + ((size%FAT_CLUSTER_SIZE)?1:0);
+            
+            if(_dataentries[i]->startcluster == cluster && cluster < endcluster)
             {
                 puts("Request Data Read...");
+                
                 // Download from google drive
                 // Open file
                 // read & copy & return
+                unsigned long loc;
+                loc = (sector - _fs.rootdir_first_sector);
+                loc -= (_dataentries[i]->startcluster - _fs.rootdir_first_cluster)*_fs.sectors_per_cluster;
+                
+                read_file(download_file(_dataentries[i]->id), loc, buffer, sector_count);
             }
         }
     }
@@ -265,7 +274,7 @@ int read_virtual(unsigned long sector, unsigned char *buffer, unsigned long sect
     return 1;
 }
 
-int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sector_count)
+int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
 {
     // ~ 1024 Byte (Reserved area)
     if(sector == 1 && sector_count == 1)
@@ -310,7 +319,8 @@ int write_virtual(unsigned long sector, unsigned char *buffer, unsigned long sec
             if(_dataentries[i] == NULL)
                 return 0;
             
-            if(_dataentries[i]->startcluster == cluster)
+            if(_dataentries[i]->startcluster <= cluster &&
+               cluster < (_dataentries[i]->startcluster + (_dataentries[i]->size/FAT_CLUSTER_SIZE)))
                 return 1;
         }
     }
@@ -409,7 +419,7 @@ void write_entries()
 
 // download from google drive by file ID
 // return file descriptor
-int download_file(char *fid, char *filename)
+int download_file(char *fid)
 {
     char cmd[CMD_LEN_FULL] = "sudo python ";
     strncat(cmd, _script_path, strlen(_script_path)-7);
@@ -418,22 +428,25 @@ int download_file(char *fid, char *filename)
     
     system(cmd);
     
-    return open(filename, O_RDONLY);
-    
-    return 1;
+    return open(fid, O_RDONLY);
 }
 
-int read_file(int fd, uint32 sector, unsigned char *buffer, uint32 sector_count)
+int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count)
 {
-    lseek(fd, 512*sector, SEEK_SET);
+    lseek(fd, FAT_SECTOR_SIZE * sector, SEEK_SET);
     
-    if(read(fd, buffer, 512 * sector_count) < 0)
+    if(read(fd, buffer, FAT_SECTOR_SIZE * sector_count) < 0)
     {
         perror("read");
         return 0;
     }
     
     return 1;
+}
+
+void return_request(uint32 offset, unsigned char *buffer, uint32 offset_count)
+{
+    read_virtual(offset/FAT_SECTOR_SIZE, buffer, offset_count/FAT_SECTOR_SIZE);
 }
 
 //void ans_request(uint32 offset, unsigned char *buffer, uint32 offset_count)
