@@ -12,8 +12,10 @@
 //-----------------------------------------------------------------------------
 // Defines
 //-----------------------------------------------------------------------------
+#define TRUE 1
+#define FALSE 0
 #define PATH_LEN_FULL 256
-#define CMD_LEN_FULL 256
+#define CMD_LEN_FULL 1024
 #define DIR_ENTRY_TABLE_FULL 1024
 #define DATA_ENTRY_TABLE_FULL 1024
 #define FILE_ID_LEN_FULL 65
@@ -35,6 +37,8 @@ struct dataentry
     uint32                  startcluster;
     uint32                  size;
     char                    id[FILE_ID_LEN_FULL];
+    uint8                   download;
+    int                     fd;
 };
 
 //-----------------------------------------------------------------------------
@@ -43,7 +47,7 @@ struct dataentry
 void read_path(char *exec_path);
 
 void create_boot_record();
-void create_fat();
+void create_fat_area();
 void create_rootdir_entry();
 
 int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count);
@@ -59,4 +63,5 @@ void write_entries();
 int download_file(char *fid);
 int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count);
 
+void read_requested(uint32 offset, unsigned char *buffer, uint32 offset_count);
 #endif /* fat_custom_h */

@@ -123,7 +123,7 @@ void create_boot_record()
     memcpy(_reserved_area_first, reserved, FAT_SECTOR_SIZE);
 }
 
-void create_fat()
+void create_fat_area()
 {
     unsigned char fat[] =
     {
@@ -203,6 +203,9 @@ void create_rootdir_entry()
 
 int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
 {
+    if(!buffer || !sector_count)
+        return -1;
+    
     // ~512 Byte (Boot record)
     if(sector == 0 && sector_count == 1)
     {
@@ -257,16 +260,20 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
             
             if(_dataentries[i]->startcluster == cluster && cluster < endcluster)
             {
-                puts("Request Data Read...");
-                
-                // Download from google drive
-                // Open file
-                // read & copy & return
+                // Download, Open, Read
                 unsigned long loc;
                 loc = (sector - _fs.rootdir_first_sector);
                 loc -= (_dataentries[i]->startcluster - _fs.rootdir_first_cluster)*_fs.sectors_per_cluster;
                 
-                read_file(download_file(_dataentries[i]->id), loc, buffer, sector_count);
+                if(!_dataentries[i]->download)
+                {
+                    _dataentries[i]->fd = download_file(_dataentries[i]->id);
+                    _dataentries[i]->download = TRUE;
+                }
+                
+                read_file(_dataentries[i]->fd, loc, buffer, sector_count);
+                
+                return 1;
             }
         }
     }
@@ -276,6 +283,9 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
 
 int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
 {
+    if(!sector || !buffer || !sector_count)
+        return -1;
+    
     // ~ 1024 Byte (Reserved area)
     if(sector == 1 && sector_count == 1)
     {
@@ -384,6 +394,7 @@ int create_dataentry(uint32 startcluster, uint32 fsize, char *fid)
             
             _dataentries[i]->startcluster = startcluster;
             _dataentries[i]->size = fsize;
+            _dataentries[i]->download = FALSE;
             
             memcpy(_dataentries[i]->id, fid, FILE_ID_LEN_FULL);
             
@@ -444,28 +455,7 @@ int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long
     return 1;
 }
 
-void return_request(uint32 offset, unsigned char *buffer, uint32 offset_count)
+void read_requested(uint32 offset, unsigned char *buffer, uint32 offset_count)
 {
     read_virtual(offset/FAT_SECTOR_SIZE, buffer, offset_count/FAT_SECTOR_SIZE);
 }
-
-//void ans_request(uint32 offset, unsigned char *buffer, uint32 offset_count)
-//{
-//    int i;
-//    int fd = -1;
-//    
-//    uint32 cluster = (((offset/FAT_SECTOR_SIZE) - (_fs.rootdir_first_sector))/_fs.sectors_per_cluster) - _fs.rootdir_first_cluster;
-//    
-//    int intable = 1;
-//    for(i=0; i<_table_size; ++i)
-//        if(_table[i].start_cluster <= cluster && cluster < _table[i].size)
-//        {
-//            fd = download_from_g_drive(_table[i].fileid);
-//            break;
-//        }
-//    
-//    if(intable)
-//        read_file(fd, (cluster - _table[i].start_cluster) * _fs.sectors_per_cluster, buffer, offset_count/FAT_SECTOR_SIZE);
-//    else
-//        read_image(offset/FAT_SECTOR_SIZE, buffer, offset_count/FAT_SECTOR_SIZE);
-//}
