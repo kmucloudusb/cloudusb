@@ -16,7 +16,7 @@
 struct module_init{
     int pid;
     unsigned int amount;
-    long long file_offset;
+    loff_t file_offset;
 };
 
 struct return_file{
@@ -61,10 +61,10 @@ int main(int argc, char *argv[])
     // Make allocation table
     write_entries();
     
-    /* 모든 구글API설정이 끝난 후 */
+    /* After all Google API configuration */
     signal(SIGCONT, file_transfer);
     
-    /* 커널모듈로 전송 */
+    /* send to kernel module */
     inits.pid = getpid();
     printf("User Pid is %d\n", inits.pid);
     
@@ -92,18 +92,18 @@ int main(int argc, char *argv[])
 void file_transfer(int signo){
     int ret = 0;
     struct return_file files;
-    printf("유저프로그램 시그널 전달받음\n");
+    printf("User program receives signal!\n");
     
-    uint32 offset_count = inits.amount; // 블록요청 길이
-    uint32 offset = inits.file_offset; // 블록요청 시작지점
+    uint32 offset_count = inits.amount; // Block request length
+    uint32 offset = inits.file_offset; // Block request start point
     
     memset(buffer, 0x00, FAT_SECTOR_SIZE);
     read_requested(offset, buffer, offset_count);
     
-    files.buf = buffer; // 파일정보를 담은 버퍼의 주소를 넣어줌
-    files.nread = FAT_SECTOR_SIZE; // 파일정보를 담은 버퍼의 길이를 넣어줌
+    files.buf = buffer; // substitute buffer address which have file info
+    files.nread = FAT_SECTOR_SIZE; // substitute buffer length which have file info
     
-    ret = ioctl(fd, RETURN_FILE, &files); // 파일정보가 담긴 구조체 전달
+    ret = ioctl(fd, RETURN_FILE, &files); // transfer structure which have file info
     
     if(ret < 0)
         printf("Error in IOCTL2 errno: %d\r\n", errno);
