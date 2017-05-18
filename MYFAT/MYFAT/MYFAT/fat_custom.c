@@ -233,7 +233,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         
         unsigned long cluster = (sector - _fs.rootdir_first_sector)/_fs.sectors_per_cluster + _fs.rootdir_first_cluster;
         
-        // Fine on directory entry cluster table
+        // Find on directory entry cluster table
         for (i=0; i<DIR_ENTRY_TABLE_FULL; ++i)
         {
             if(_direntries[i] == NULL)
@@ -241,6 +241,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
             
             if(_direntries[i]->cluster == cluster)
             {
+                // Location in cluster
                 unsigned long loc = ((sector - _fs.rootdir_first_sector) % _fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
                 
                 memcpy(buffer, _direntries[i]->entry + loc, sector_count * FAT_SECTOR_SIZE);
@@ -258,13 +259,15 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
             uint32 size = _dataentries[i]->size;
             uint32 endcluster = _dataentries[i]->startcluster + size/FAT_CLUSTER_SIZE + ((size%FAT_CLUSTER_SIZE)?1:0);
             
+            // The file requested
             if(_dataentries[i]->startcluster == cluster && cluster < endcluster)
             {
                 // Download, Open, Read
                 unsigned long loc;
                 loc = (sector - _fs.rootdir_first_sector);
-                loc -= (_dataentries[i]->startcluster - _fs.rootdir_first_cluster)*_fs.sectors_per_cluster;
+                loc -= (_dataentries[i]->startcluster - _fs.rootdir_first_cluster) * _fs.sectors_per_cluster;
                 
+                // Be downloaded?
                 if(!_dataentries[i]->download)
                 {
                     _dataentries[i]->fd = download_file(_dataentries[i]->id);
@@ -276,6 +279,8 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 return 1;
             }
         }
+        
+        return -1;
     }
     
     return 1;
@@ -305,11 +310,11 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     {
         unsigned long i;
         
-        // location on cluster
+        // Location in cluster
         unsigned long loc = ((sector - _fs.rootdir_first_sector) % _fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
         unsigned long cluster = (sector - _fs.rootdir_first_sector)/_fs.sectors_per_cluster + _fs.rootdir_first_cluster;
         
-        // Fine on directory entry cluster table
+        // Find on directory entry cluster table
         for (i=0; i<DIR_ENTRY_TABLE_FULL; ++i)
         {
             if(_direntries[i] == NULL)
@@ -333,6 +338,8 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                cluster < (_dataentries[i]->startcluster + (_dataentries[i]->size/FAT_CLUSTER_SIZE)))
                 return 1;
         }
+        
+        return -1;
     }
     
     return 1;
