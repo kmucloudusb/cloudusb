@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -W -Wall
+CFLAGS = -W -Wall -lpthread
 TARGET = main.out
 OBJECTS = fat_access.o fat_cache.o fat_filelib.o fat_format.o fat_misc.o fat_string.o fat_write.o fat_table.o fat_custom.o main.o
 
