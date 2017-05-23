@@ -79,10 +79,11 @@ def main():
 
     ## 파일 다운로드
 
-    # 파일 size
-    # file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms" #debug
-    drive_file = service.files().get(fileId=file_id, fields='size').execute()
-
+    # 디버그용 
+    #file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms"
+    #drive_file = service.files().get(fileId=file_id, fields='size').execute()
+    #byte_begin = 0
+    #byte_end = int(drive_file.get('size'))  
 
     file_path = './'
 
@@ -90,19 +91,19 @@ def main():
 
 
 def partial_download(service, file_id, byte_begin, byte_end, file_path):
-    drive_file = service.files().get(fileId=file_id, fields='size, id').execute()
+    drive_file = service.files().get(fileId=file_id, fields='size, id, originalFilename').execute()
 
     download_url = service.files().get_media(fileId=file_id).uri
     # print("download_url:"+ download_url)
     total_size = int(drive_file.get('size'))
-    # originalFilename = drive_file.get('originalFilename')
+    originalFilename = drive_file.get('originalFilename')
     filename = file_path + file_id
 
     # print("file_path:"+ file_path)
     # originalFilename
     if download_url:
         with open(filename, 'wb') as file:
-            print("Bytes downloaded: ")
+            print("downloaded: ")
             headers = {"Range": 'bytes=%s-%s' % (byte_begin, byte_end)}
             resp, content = service._http.request(download_url, headers=headers)
             if resp.status == 206:
@@ -111,7 +112,7 @@ def partial_download(service, file_id, byte_begin, byte_end, file_path):
             else:
                 print('An error occurred: %s' % resp)
                 return None
-            print(str(byte_end - byte_begin) + "Bytes Success!")
+            print(originalFilename + " - offset: (" + str(byte_begin) + ", " + str(byte_end) + "), size: " +str(byte_end - byte_begin) + " [Success!]")
         return filename
     else:
         return None
