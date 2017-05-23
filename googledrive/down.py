@@ -13,16 +13,25 @@ from oauth2client.file import Storage
 from apiclient.http import MediaIoBaseDownload
 
 file_id = ''
+byte_begin = -1
+byte_end = -1
 
 try:
     import argparse
-    
+
     tools.argparser.add_argument('--down', default='-1', help='file id')
+    tools.argparser.add_argument('--begin', default='-1', help='begin offset')
+    tools.argparser.add_argument('--end', default='-1', help='end offset')
 
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
 
     if flags.down:
         file_id = flags.down
+    if flags.begin:
+        byte_begin = flags.begin
+    if flags.end:
+        byte_end = flags.end
+
 
 except ImportError:
     flags = None
@@ -71,41 +80,42 @@ def main():
     ## 파일 다운로드
 
     # 파일 size
-    #file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms" #debug
+    # file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms" #debug
     drive_file = service.files().get(fileId=file_id, fields='size').execute()
-    byte_begin = 0
-    byte_end = int(drive_file.get('size'))
+
 
     file_path = './'
 
     partial_download(service, file_id, byte_begin, byte_end, file_path)
 
+
 def partial_download(service, file_id, byte_begin, byte_end, file_path):
     drive_file = service.files().get(fileId=file_id, fields='size, id').execute()
 
     download_url = service.files().get_media(fileId=file_id).uri
-    #print("download_url:"+ download_url)
+    # print("download_url:"+ download_url)
     total_size = int(drive_file.get('size'))
-    #originalFilename = drive_file.get('originalFilename')
+    # originalFilename = drive_file.get('originalFilename')
     filename = file_path + file_id
 
-    #print("file_path:"+ file_path)
-    #originalFilename
+    # print("file_path:"+ file_path)
+    # originalFilename
     if download_url:
         with open(filename, 'wb') as file:
             print("Bytes downloaded: ")
-            headers = {"Range" : 'bytes=%s-%s' % (byte_begin, byte_end)}
+            headers = {"Range": 'bytes=%s-%s' % (byte_begin, byte_end)}
             resp, content = service._http.request(download_url, headers=headers)
-            if resp.status == 206 :
+            if resp.status == 206:
                 file.write(content)
                 file.flush()
             else:
                 print('An error occurred: %s' % resp)
                 return None
-            print(str(byte_end - byte_begin)+"Bytes Success!")
+            print(str(byte_end - byte_begin) + "Bytes Success!")
         return filename
     else:
-        return None  
+        return None
+
 
 if __name__ == '__main__':
     main()
