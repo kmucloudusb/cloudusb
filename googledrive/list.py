@@ -61,6 +61,8 @@ def get_credentials():
         print('Storing credentials to ' + credential_path)
     return credentials
 
+def metaDataListsortKey(keyValue):
+    return (keyValue.split())[1]
 
 def main():
     credentials = get_credentials()
@@ -93,8 +95,13 @@ def main():
     listing_files(service, root_dir_id, "", result_files, result_directories)
     del result_directories[0]
 
+
+    # sorted_result_directories = result_files
+    sorted_result_files= sorted(result_files, reverse=False, key=metaDataListsortKey)
+
+
     # 3. 탐색한 파일, 디렉토리 정보를 보여줌
-    for file in result_files:
+    for file in sorted_result_files:
         print(file)
 
     # 4. 파일, 디렉토리 정보를 파이프에 저장
@@ -107,10 +114,14 @@ def main():
 
     fifo = open(PIPE_PATH, "w")    
     try:
-        for file in result_files:
+        for file in sorted_result_files:
             fifo.write(file + "\n")
     finally:
         fifo.close()
+
+
+
+
 
 
 def listing_files(service, folderID, directory, result_files, result_directories):
@@ -127,7 +138,7 @@ def listing_files(service, folderID, directory, result_files, result_directories
     else:
         for item in items:
             if item['mimeType'] == FOLDER:
-                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "1", "0", "1"))
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "0", "0", "1"))
                 listing_files(service, item['id'], directory + "/%s" % item['name'], result_files, result_directories)
             else:
                 result_files.append('%s %s %s %s' % (directory + '/' + item['name'], item['size'] ,item['id'], '0'))

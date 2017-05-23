@@ -71,8 +71,7 @@ def main():
     ## 파일 다운로드
 
     # 파일 size
-    #file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms" #debug!
-    
+    #file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms" #debug
     drive_file = service.files().get(fileId=file_id, fields='size').execute()
     byte_begin = 0
     byte_end = int(drive_file.get('size'))
