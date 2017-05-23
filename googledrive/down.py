@@ -71,6 +71,7 @@ def main():
     ## 파일 다운로드
 
     # 파일 size
+    file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms"
     drive_file = service.files().get(fileId=file_id, fields='size').execute()
     byte_begin = 0
     byte_end = int(drive_file.get('size'))
@@ -83,10 +84,12 @@ def partial_download(service, file_id, byte_begin, byte_end, file_path):
     drive_file = service.files().get(fileId=file_id, fields='size, id').execute()
 
     download_url = service.files().get_media(fileId=file_id).uri
-
+    print("download_url:"+ download_url)
     total_size = int(drive_file.get('size'))
     #originalFilename = drive_file.get('originalFilename')
     filename = file_path + file_id
+
+    print("file_path:"+ file_path)
     #originalFilename
     if download_url:
         with open(filename, 'wb') as file:

@@ -118,7 +118,7 @@ def listing_files(service, folderID, directory, result_files, result_directories
 
     results = service.files().list(
         orderBy="folder desc, createdTime",
-        q=("'%s' in parents" % folderID),
+        q=("'%s' in parents and trashed = false " % folderID),
         fields="files(id, name, mimeType, size)").execute()
     items = results.get('files', [])
     if not items:
