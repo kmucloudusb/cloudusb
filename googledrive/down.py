@@ -13,24 +13,16 @@ from oauth2client.file import Storage
 from apiclient.http import MediaIoBaseDownload
 
 file_id = ''
-byte_begin = -1
-byte_end = -1
 
 try:
     import argparse
 
     tools.argparser.add_argument('--down', default='-1', help='file id')
-    tools.argparser.add_argument('--begin', default='-1', help='begin offset')
-    tools.argparser.add_argument('--end', default='-1', help='end offset')
 
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
 
     if flags.down:
         file_id = flags.down
-    if flags.begin:
-        byte_begin = flags.begin
-    if flags.end:
-        byte_end = flags.end
 
 
 except ImportError:
@@ -81,9 +73,9 @@ def main():
 
     # 디버그용 
     #file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms"
-    #drive_file = service.files().get(fileId=file_id, fields='size').execute()
-    #byte_begin = 0
-    #byte_end = int(drive_file.get('size'))  
+    drive_file = service.files().get(fileId=file_id, fields='size').execute()
+    byte_begin = 0
+    byte_end = int(drive_file.get('size'))  
 
     file_path = './'
 
