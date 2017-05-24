@@ -91,10 +91,7 @@ def main():
 
     # 2. 최상위 폴더부터 시작해서 모든 파일, 디렉토리 정보를 탐색
     result_files = []
-    result_directories = []
-    listing_files(service, root_dir_id, "", result_files, result_directories)
-    del result_directories[0]
-
+    listing_files_with_download(service, root_dir_id, "", result_files)
 
     # sorted_result_directories = result_files
     # sorted_result_files= sorted(result_files, reverse=False, key=metaDataListsortKey)
@@ -121,12 +118,7 @@ def main():
 
 
 
-
-
-
-def listing_files(service, folderID, directory, result_files, result_directories):
-    result_directories.append(directory)
-
+def listing_files_with_download(service, folderID, directory, result_files):
     results = service.files().list(
         orderBy="folder desc, createdTime",
         q=("'%s' in parents and trashed = false " % folderID),
@@ -142,9 +134,40 @@ def listing_files(service, folderID, directory, result_files, result_directories
 
             if item['mimeType'] == FOLDER:
                 result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "1", "0", "1"))
-                listing_files(service, item['id'], directory + "/%s" % item['name'], result_files, result_directories)
+                listing_files_with_download(service, item['id'], directory + "/%s" % item['name'], result_files)
             else:
                 result_files.append('%s %s %s %s' % (directory + '/' + item['name'], item['size'] ,item['id'], '0'))
+                if( not (os.path.isfile('./'+item['id'])) ):
+                    partial_download(service, item['id'], 0, int(item['size']), './')
+                else:
+                    print(item['name'] + ": exist, Pass!")
+
+
+def partial_download(service, file_id, byte_begin, byte_end, file_path):
+    drive_file = service.files().get(fileId=file_id, fields='size, id, name').execute()
+
+    download_url = service.files().get_media(fileId=file_id).uri
+    # print("download_url:"+ download_url)
+    total_size = int(drive_file.get('size'))
+    uploadedFileName = drive_file.get('name')
+    filename = file_path + file_id
+
+    # print("file_path:"+ file_path)
+    if download_url:
+        with open(filename, 'wb') as file:
+            print("downloaded: ")
+            headers = {"Range": 'bytes=%s-%s' % (byte_begin, byte_end)}
+            resp, content = service._http.request(download_url, headers=headers)
+            if resp.status == 206:
+                file.write(content)
+                file.flush()
+            else:
+                print('An error occurred: %s' % resp)
+                return None
+            print(uploadedFileName + " - offset: (" + str(byte_begin) + ", " + str(byte_end) + "), size: " +str(byte_end - byte_begin) + " [Success!]")
+        return filename
+    else:
+        return None
 
 if __name__ == '__main__':
     main()

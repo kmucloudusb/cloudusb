@@ -83,16 +83,15 @@ def main():
 
 
 def partial_download(service, file_id, byte_begin, byte_end, file_path):
-    drive_file = service.files().get(fileId=file_id, fields='size, id, originalFilename').execute()
+    drive_file = service.files().get(fileId=file_id, fields='size, id, name').execute()
 
     download_url = service.files().get_media(fileId=file_id).uri
     # print("download_url:"+ download_url)
     total_size = int(drive_file.get('size'))
-    originalFilename = drive_file.get('originalFilename')
+    uploadedFileName = drive_file.get('name')
     filename = file_path + file_id
 
     # print("file_path:"+ file_path)
-    # originalFilename
     if download_url:
         with open(filename, 'wb') as file:
             print("downloaded: ")
@@ -104,7 +103,7 @@ def partial_download(service, file_id, byte_begin, byte_end, file_path):
             else:
                 print('An error occurred: %s' % resp)
                 return None
-            print(originalFilename + " - offset: (" + str(byte_begin) + ", " + str(byte_end) + "), size: " +str(byte_end - byte_begin) + " [Success!]")
+            print(uploadedFileName + " - offset: (" + str(byte_begin) + ", " + str(byte_end) + "), size: " +str(byte_end - byte_begin) + " [Success!]")
         return filename
     else:
         return None
