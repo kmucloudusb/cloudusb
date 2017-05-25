@@ -10,3 +10,7 @@ client_secret.json
 
 # MAC system file
 .DS_Store
+
+
+# Real Files
+**/cloud_usb_test/

@@ -88,9 +88,6 @@ def main():
     else:
         for item in first_folder_item:
             root_dir_id = item['id']
-        if not os.path.exists("./" + ROOT_FOLDER):
-            os.makedirs("./" + ROOT_FOLDER)    
-
 
     # 2. 최상위 폴더부터 시작해서 모든 파일, 디렉토리 정보를 탐색
     result_files = []
@@ -134,20 +131,14 @@ def listing_files_with_download(service, folderID, directory, result_files):
         for item in items:
             # 이름에 공백 있으면 _ 으로 치환
             item['name'] = item['name'].replace(" ", "_")
-            file_relative_path = directory + '/' + item['name']
-            file_full_path = "./" + ROOT_FOLDER + file_relative_path
+
             if item['mimeType'] == FOLDER:
-                result_files.append('%s %s %s %s' % (file_relative_path, "1", "0", "1"))
-                if not os.path.exists(file_full_path):
-                    os.makedirs(file_full_path)
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "1", "0", "1"))
                 listing_files_with_download(service, item['id'], directory + "/%s" % item['name'], result_files)
             else:
-                result_files.append('%s %s %s %s' % (file_relative_path, item['size'] ,item['id'], '0'))
-                if( not (os.path.isfile(file_full_path)) ):
-                    partial_download(service, item['id'], 0, int(item['size']), file_full_path)
-                if( os.path.getsize(file_full_path) != int(item['size']) ):
-                    print(item['name'] + ": exist, but loss size!")
-                    partial_download(service, item['id'], 0, int(item['size']), file_full_path)
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], item['size'] ,item['id'], '0'))
+                if( not (os.path.isfile('./'+item['id'])) ):
+                    partial_download(service, item['id'], 0, int(item['size']), './')
                 else:
                     print(item['name'] + ": exist, Pass!")
 
@@ -159,10 +150,7 @@ def partial_download(service, file_id, byte_begin, byte_end, file_path):
     # print("download_url:"+ download_url)
     total_size = int(drive_file.get('size'))
     uploadedFileName = drive_file.get('name')
-    # filename = file_path + file_id
-    filename = file_path
-
-    print(filename)
+    filename = file_path + file_id
 
     # print("file_path:"+ file_path)
     if download_url:
