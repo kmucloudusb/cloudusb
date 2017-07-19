@@ -347,7 +347,7 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
 
 void download_metadata()
 {
-    char cmd[CMD_LEN_FULL] = "sudo python ";
+    char cmd[CMD_LEN_FULL] = "python ";
     strcat(cmd, _script_path);
     strcat(cmd, " --path ");
     strcat(cmd, _pipe_path);
