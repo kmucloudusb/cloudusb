@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     write_entries();
     
     /* After all Google API configuration */
-    signal(SIGCONT, file_transfer);
+    signal(SIGUSR1, file_transfer);
     
     /* send to kernel module */
     inits.pid = getpid();
