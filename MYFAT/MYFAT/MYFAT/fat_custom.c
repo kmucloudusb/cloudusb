@@ -76,6 +76,13 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     // (FAT area)
     else if(_fs.fat_begin_lba <= sector && sector < _fs.rootdir_first_sector)
     {
+        if (sector > _fs.fat_begin_lba + 2)
+        {
+            memcpy(buffer, _blank, FAT_SECTOR_SIZE);
+            
+            return 1;
+        }
+        
         unsigned long loc = (sector - _fs.fat_begin_lba) * FAT_SECTOR_SIZE;
         
         memcpy(buffer, _fat_area + loc, sector_count * FAT_SECTOR_SIZE);
