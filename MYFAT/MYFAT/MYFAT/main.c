@@ -36,6 +36,9 @@ int main(int argc, char *argv[])
     // Read paths to script, pipe
     read_path(argv[0]);
     
+    // Create blank sector
+    create_blank();
+    
     // Create boot record area
     create_boot_record();
     

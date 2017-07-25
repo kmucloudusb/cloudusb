@@ -46,6 +46,7 @@ struct dataentry
 //-----------------------------------------------------------------------------
 void read_path(char *exec_path);
 
+void create_blank();
 void create_boot_record();
 void create_fat_area();
 void create_rootdir_entry();
