@@ -68,6 +68,11 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         memcpy(buffer, _reserved_area_first, FAT_SECTOR_SIZE);
     }
     
+    else if(sector == 64 && sector_count == 1)
+    {
+        memcpy(buffer, _blank, FAT_SECTOR_SIZE);
+    }
+    
     // (FAT area)
     else if(_fs.fat_begin_lba <= sector && sector < _fs.rootdir_first_sector)
     {
