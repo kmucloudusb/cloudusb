@@ -52,97 +52,96 @@ void create_rootdir_entry()
 
 int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
 {
-    if(!buffer || !sector_count)
-        return -1;
+    int sector_loc = sector;
+    int read_count = 0;
     
-    // ~ 512 Byte (Boot record)
-    // ~ 3072 ~ (3072+512) (Boot record backup)
-    if((sector == 0 && sector_count == 1) || (sector == 6 && sector_count == 1))
+    while (sector_count == read_count && read_count < 32)
     {
-        memcpy(buffer, _br, FAT_SECTOR_SIZE);
-    }
-    
-    // 512 ~ 1024 Byte (First sector of reserved area)
-    else if(sector == 1 && sector_count == 1)
-    {
-        memcpy(buffer, _reserved_area_first, FAT_SECTOR_SIZE);
-    }
-    
-    else if(sector == 64 && sector_count == 1)
-    {
-        memcpy(buffer, _blank, FAT_SECTOR_SIZE);
-    }
-    
-    // (FAT area)
-    else if(_fs.fat_begin_lba <= sector && sector < _fs.rootdir_first_sector)
-    {
-        if (sector > _fs.fat_begin_lba + 2)
+        // ~ 512 Byte (Boot record)
+        // ~ 3072 ~ (3072+512) (Boot record backup)
+        if (sector_loc == 0 || sector_loc == 6)
         {
-            memcpy(buffer, _blank, FAT_SECTOR_SIZE);
-            
-            return 1;
+            memcpy(buffer+read_count*FAT_SECTOR_SIZE, _br, FAT_SECTOR_SIZE);
         }
         
-        unsigned long loc = (sector - _fs.fat_begin_lba) * FAT_SECTOR_SIZE;
         
-        memcpy(buffer, _fat_area + loc, sector_count * FAT_SECTOR_SIZE);
-    }
-    
-    // Root directory first sector ~ (Directory entry)
-    else
-    {
-        unsigned long i;
-        
-        unsigned long cluster = (sector - _fs.rootdir_first_sector)/_fs.sectors_per_cluster + _fs.rootdir_first_cluster;
-        
-        // Find on directory entry cluster table
-        for (i=0; i<DIR_ENTRY_TABLE_FULL; ++i)
+        else if (sector_loc == 1 || sector_loc == 7)
         {
-            if(_direntries[i] == NULL)
-                break;
-            
-            if(_direntries[i]->cluster == cluster)
-            {
-                // Location in cluster
-                unsigned long loc = ((sector - _fs.rootdir_first_sector) % _fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
-                
-                memcpy(buffer, _direntries[i]->entry + loc, sector_count * FAT_SECTOR_SIZE);
-                
-                return 1;
-            }
+            memcpy(buffer+read_count*FAT_SECTOR_SIZE, _reserved_area_first, FAT_SECTOR_SIZE);
         }
         
-        // Find on data cluster table
-        for(i=0; i<DATA_ENTRY_TABLE_FULL; ++i)
+        // (FAT area)
+        else if (_fs.fat_begin_lba <= sector_loc && sector_loc < _fs.cluster_begin_lba+2)
         {
-            if(_dataentries[i] == NULL)
-                break;
+            unsigned long loc = (sector_loc - _fs.fat_begin_lba) * FAT_SECTOR_SIZE;
             
-            uint32 size = _dataentries[i]->size;
-            uint32 endcluster = _dataentries[i]->startcluster + size/FAT_CLUSTER_SIZE + ((size%FAT_CLUSTER_SIZE)?1:0);
+            memcpy(buffer+read_count*FAT_SECTOR_SIZE, _fat_area + loc, FAT_SECTOR_SIZE);
+        }
+        
+        else if (sector_loc < _fs.rootdir_first_sector)
+        {
+            memcpy(buffer+read_count*FAT_SECTOR_SIZE, _blank, FAT_SECTOR_SIZE);
+        }
+        
+        // Root directory first sector ~ (Directory entry)
+        else
+        {
+            unsigned long i;
             
-            // The file requested
-            if(_dataentries[i]->startcluster == cluster && cluster < endcluster)
+            unsigned long cluster = (sector_loc - _fs.rootdir_first_sector)/_fs.sectors_per_cluster + _fs.rootdir_first_cluster;
+            
+            // Find on directory entry cluster table
+            for (i=0; i<DIR_ENTRY_TABLE_FULL; ++i)
             {
-                // Download, Open, Read
-                unsigned long loc;
-                loc = (sector - _fs.rootdir_first_sector);
-                loc -= (_dataentries[i]->startcluster - _fs.rootdir_first_cluster) * _fs.sectors_per_cluster;
+                if(_direntries[i] == NULL)
+                    break;
                 
-                // Be downloaded?
-                if(!_dataentries[i]->download)
+                if(_direntries[i]->cluster == cluster)
                 {
-                    _dataentries[i]->fd = download_file(_dataentries[i]->id);
-                    _dataentries[i]->download = TRUE;
+                    // Location in cluster
+                    unsigned long loc = ((sector_loc - _fs.rootdir_first_sector) % _fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
+                    
+                    memcpy(buffer, _direntries[i]->entry + loc, (sector_count-read_count) * FAT_SECTOR_SIZE);
+                    
+                    return 1;
                 }
-                
-                read_file(_dataentries[i]->fd, loc, buffer, sector_count);
-                
-                return 1;
             }
+            
+            // Find on data cluster table
+            for(i=0; i<DATA_ENTRY_TABLE_FULL; ++i)
+            {
+                if(_dataentries[i] == NULL)
+                    break;
+                
+                uint32 size = _dataentries[i]->size;
+                uint32 endcluster = _dataentries[i]->startcluster + size/FAT_CLUSTER_SIZE + ((size%FAT_CLUSTER_SIZE)?1:0);
+                
+                // The file requested
+                if(_dataentries[i]->startcluster == cluster && cluster < endcluster)
+                {
+                    // Download, Open, Read
+                    unsigned long loc;
+                    loc = (sector_loc - _fs.rootdir_first_sector);
+                    loc -= (_dataentries[i]->startcluster - _fs.rootdir_first_cluster) * _fs.sectors_per_cluster;
+                    
+                    // Be downloaded?
+                    if(!_dataentries[i]->download)
+                    {
+                        _dataentries[i]->fd = download_file(_dataentries[i]->id);
+                        _dataentries[i]->download = TRUE;
+                    }
+                    
+                    read_file(_dataentries[i]->fd, loc, buffer+read_count*FAT_SECTOR_SIZE, (sector_count-read_count));
+                    
+                    return 1;
+                }
+            }
+            
+            return -1;
         }
         
-        return -1;
+        sector_loc ++;
+        read_count ++;
     }
     
     return 1;
