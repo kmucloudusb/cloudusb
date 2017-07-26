@@ -104,7 +104,7 @@ void file_transfer(int signo){
     read_requested(offset, buffer, offset_count);
     
     files.buf = buffer; // substitute buffer address which have file info
-    files.nread = inits.file_offset; // substitute buffer length which have file info
+    files.nread = inits.amount; // substitute buffer length which have file info
     
     ret = ioctl(fd, RETURN_FILE, &files); // transfer structure which have file info
     
