@@ -72,7 +72,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         }
         
         // (FAT area)
-        else if (_fs.fat_begin_lba <= sector_loc && sector_loc < _fs.cluster_begin_lba+2)
+        else if (_fs.fat_begin_lba <= sector_loc && sector_loc < _fs.fat_begin_lba+2)
         {
             unsigned long loc = (sector_loc - _fs.fat_begin_lba) * FAT_SECTOR_SIZE;
             
