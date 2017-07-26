@@ -55,7 +55,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     int sector_loc = sector;
     int read_count = 0;
     
-    while (sector_count == read_count && read_count < 32)
+    while (sector_count > read_count && read_count < 32)
     {
         // ~ 512 Byte (Boot record)
         // ~ 3072 ~ (3072+512) (Boot record backup)
@@ -63,7 +63,6 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         {
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _br, FAT_SECTOR_SIZE);
         }
-        
         
         else if (sector_loc == 1 || sector_loc == 7)
         {
