@@ -55,6 +55,8 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     int sector_loc = sector;
     int read_count = 0;
     
+    printf("sector == %d, sector_coun == %d\n", sector_loc, sector_count);
+    
     while (sector_count > read_count && read_count < 32)
     {
         // ~ 512 Byte (Boot record)
