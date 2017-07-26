@@ -55,10 +55,12 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     int sector_loc = sector;
     int read_count = 0;
     
-    printf("sector == %d, sector_count == %d, rootdir_first_sector == %d\n", sector_loc, sector_count, _fs.rootdir_first_sector);
+    printf("sector == %d, sector_count == %d\n", sector_loc, sector_count);
     
     while (sector_count > read_count && read_count < 32)
     {
+        printf("sector loc == %d, read count == %d\n", sector_loc, read_count);
+        
         // ~ 512 Byte (Boot record)
         // ~ 3072 ~ (3072+512) (Boot record backup)
         if (sector_loc == 0 || sector_loc == 6)
