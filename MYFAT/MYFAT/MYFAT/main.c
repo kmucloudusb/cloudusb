@@ -16,7 +16,7 @@
 struct module_init{
     int pid;
     unsigned int amount;
-    loff_t file_offset;
+    long long file_offset;
 };
 
 struct return_file{
@@ -104,7 +104,7 @@ void file_transfer(int signo){
     read_requested(offset, buffer, offset_count);
     
     files.buf = buffer; // substitute buffer address which have file info
-    files.nread = FAT_SECTOR_SIZE; // substitute buffer length which have file info
+    files.nread = inits.file_offset; // substitute buffer length which have file info
     
     ret = ioctl(fd, RETURN_FILE, &files); // transfer structure which have file info
     
