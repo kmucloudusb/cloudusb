@@ -55,7 +55,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     int sector_loc = sector;
     int read_count = 0;
     
-    printf("sector == %d, sector_coun == %d\n", sector_loc, sector_count);
+    printf("sector == %d, sector_count == %d\n", sector_loc, sector_count);
     
     while (sector_count > read_count && read_count < 32)
     {
@@ -91,6 +91,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
             
             unsigned long cluster = (sector_loc - _fs.rootdir_first_sector)/_fs.sectors_per_cluster + _fs.rootdir_first_cluster;
             
+            puts("in dir entry");
             // Find on directory entry cluster table
             for (i=0; i<DIR_ENTRY_TABLE_FULL; ++i)
             {
@@ -108,6 +109,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 }
             }
             
+            puts("data entry table");
             // Find on data cluster table
             for(i=0; i<DATA_ENTRY_TABLE_FULL; ++i)
             {
@@ -138,6 +140,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 }
             }
             
+            puts("copy blank");
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _blank, FAT_SECTOR_SIZE);
 //            return -1;
         }
