@@ -138,7 +138,8 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 }
             }
             
-            return -1;
+            memcpy(buffer+read_count*FAT_SECTOR_SIZE, _blank, FAT_SECTOR_SIZE);
+//            return -1;
         }
         
         sector_loc ++;
