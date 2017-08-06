@@ -21,7 +21,7 @@ struct module_init{
 
 struct return_file{
     char *buf;
-    int nread;
+    ssize_t nread;
 };
 
 struct module_init inits;
