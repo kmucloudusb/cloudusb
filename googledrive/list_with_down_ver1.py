@@ -139,6 +139,9 @@ def listing_files_with_download(service, folderID, directory, result_files):
                 result_files.append('%s %s %s %s' % (directory + '/' + item['name'], item['size'] ,item['id'], '0'))
                 if( not (os.path.isfile('./'+item['id'])) ):
                     partial_download(service, item['id'], 0, int(item['size']), './')
+                elif( os.path.getsize('./'+item['id']) != int(item['size']) ):
+                    print(item['name'] + ": exist, but loss size!")
+                    partial_download(service, item['id'], 0, int(item['size']), './')
                 else:
                     print(item['name'] + ": exist, Pass!")
 
