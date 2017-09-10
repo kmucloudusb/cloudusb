@@ -106,6 +106,8 @@ int fatfs_allocate_free_space(struct fatfs *fs, int newFile, uint32 *startCluste
         if (!fatfs_find_blank_cluster(fs, fs->rootdir_first_cluster, &nextcluster))
             return 0;
 
+        *startCluster = nextcluster;
+        
         // If this is all that is needed then all done
         if (clusterCount==1)
         {
