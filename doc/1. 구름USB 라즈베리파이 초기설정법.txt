@@ -1,0 +1,75 @@
+라즈베리파이 sd카드에 설치하기(on mac)
+1. sd카드 연결후 diskutil list로 sd카드의 디바이스명 확인
+2. 디스크 유틸리티 앱에서 sd카드의 마운트를 해제
+3. sudo dd bs=4m if=./2017-04-10-raspbian-jessie-lite.img of=/dev/disk2 이후 10분쯤 기다림
+
+라즈베리파이 초기설정하기
+1. 라즈베리파이에 hdmi모니터, 키보드 연결
+2. 로그인 아이디/비밀번호 : pi / raspberry
+3. 키보드 세팅  /etc/default/keyboard -> 언어 “us” 로 변경
+4. sudo reboot
+5.와이파이 연결
+sudo vi /etc/wpa_supplicant/wpa_supplicant.conf 에서 맨밑에 아래내용 추가
+network={
+   ssid=“SSID_NAME”
+   psk=“SSID_PASSWORD”
+   key_mgmt=WPA-PSK
+}
+이후 sudo reboot
+
+vim, git 설치하기.
+sudo apt-get update
+sudo apt-get install vim
+sudo apt-get install git
+sudo vi ~/.vimrc 에 아래4줄 추가
+syntax on
+set autoindent
+set cindent
+set nu
+
+
+가젯드라이버 다운받기
+git clone https://github.com/lch01387/for_pi
+
+구름USB프로젝트 다운로드
+git clone https://github.com/kmucloudusb/cloudeusb.git
+
+
+g_mass_storage 모듈 적재
+1./boot/config.txt 에 아래한줄 추가
+dtoverlay=dwc2
+
+2. /etc/modules 에 아래두줄 추가
+dwc2
+g_mass_storage
+
+3. sudo reboot
+4. 이미지파일 만들기
+sudo dd if=/dev/zero of=/piusb.bin bs=1M count=1K
+sudo mkdosfs -F 32 -s 8 -S 512 /piusb.bin
+==> FAT32 100MB 이미지파일이 생성됨.
+
+4.적재하는법.
+sudo modprobe g_mass_storage file=/piusb.bin stall=0
+- 이과정은 생략해도 됨.
+
+
+구글드라이브 인증받기.(ssh로 접속후 진행권장)
+cd ~/cloudeusb/googledrive/ 로 이동
+sudo apt-get install python-pip -y
+sudo pip install --upgrade google-api-python-client
+python list.py --noauth_local_webserver
+나오는 주소 브라우저에 복붙하고 한울이계정으로 로그인후 나오는코드 써주면됨
+
+유저프로그램 컴파일
+cd ~/MyCloudUSB/MYFAT/MYFAT/MYFAT/ 이동 후
+make 실행.
+
+라즈베리파이 커널소스코드 다운로드
+1. ~/cloudeusb/script 디렉토리의 rpisrc_install.sh 실행
+2. sudo apt-get install bc
+3. sudo apt-get install libncurses5-dev
+4. sudo reboot
+5. rpi-source
+- 절대 sudo rpi-source하지 말것.
+6. 제대로 다운받아졌다면 /lib/modules/4.4.50+/ 위치에 source디렉토리가 생성되어 있다.

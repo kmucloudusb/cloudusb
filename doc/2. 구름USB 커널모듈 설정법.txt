@@ -1,0 +1,37 @@
+git clone https://github.com/lch01387/for_pi
+
+소스 다운받으면 for_pi/cloudusb디렉토리에 communicate_module과 kernel_module파일이 존재한다.
+kernel_module : 가젯드라이버 소스수정 및 컴파일
+communicate_module : 가젯드라이버와 유저프로그램의 통신 담당모듈
+test_codes : 참고 코드
+
+시작전 uname -r 명령어로 리눅스버전이 4.4.50+인지 확인한다.
+
+communicate_module 디렉토리에서..
+1. communicate_module 디렉토리에서 make실행.
+
+2. sudo insmod connModule.ko 명령어로 connModule을 적재한다.
+- lsmod 명령어로 모듈적재 잘됬는지 확인가능.
+- connModule의 캐릭터디바이스 등록 잘됬는지 확인하기위해 vi /proc/devices 명령어 실행하고 235 CloudUSB 있는지 확인.
+
+3. sh makenode.sh 명령어로 캐릭터노드를 등록한다.
+- 캐릭터노드 잘만들어졌는지 확인하기위해 ls -al /dev/CloudUSB 실행. 한줄나오면됨.
+
+kernel_module 디렉토리에서..
+1.  두개의 Makefile을 열어서 각각 4번째줄 KBUILD_EXTRA_SYMBOLS 뒤의 경로가 communicate_module 디렉토리의 심볼파일을 제대로 가르키도록 수정한다.
+
+2. sh movefile.sh 명령어를 실행한다.
+
+3. cd /lib/modules/4.4.50+/source/ 디렉토리로 이동한다.
+
+4. sh compile.sh 명령어를 실행.
+
+5. sudo reboot하면 초기설정 끝
+
+구름USB 작동법
+sh /home/pi/cloudusb/boot1.sh 실행
+이후 UserPid~ 와 STRUCT ADDRESS~가 출력되면
+sh /home/pi/cloudusb/boot2.sh 를 실행한다.
+
+로그찍기
+grep -r "CloudUSB" /var/log/
