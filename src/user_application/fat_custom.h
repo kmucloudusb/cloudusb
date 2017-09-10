@@ -56,7 +56,7 @@ struct module_init
 
 struct return_file
 {
-    char *buf;
+    uint8 *buf;
     int nread;
 };
 

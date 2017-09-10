@@ -27,8 +27,8 @@ struct direntry *_direntries[DIR_ENTRY_TABLE_FULL];
 struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
 struct module_init inits;
 
-int fd;
-uint8 buffer[BUFF_LEN_FULL];
+int module_fd;
+uint8 module_buffer[BUFF_LEN_FULL];
 
 //-----------------------------------------------------------------------------
 // Locals
@@ -354,7 +354,7 @@ void run_module()
     inits.pid = getpid();
     printf("User Pid is %d\n", inits.pid);
     
-    if((fd = open("/dev/CloudUSB", O_RDWR)) < 0)
+    if((module_fd = open("/dev/CloudUSB", O_RDWR)) < 0)
     {
         puts("Device Open failed!!");
         printf("%d\n", errno);
@@ -364,7 +364,7 @@ void run_module()
     
     printf("STRUCT ADDRESS : %p\n", &inits);
     
-    if(ioctl(fd, INIT, &inits) < 0)
+    if(ioctl(module_fd, INIT, &inits) < 0)
         printf("Error in IOCTL1 errno: %d\n", errno);
     
     while(1)
@@ -378,13 +378,13 @@ void file_transfer(int signo)
     uint32 offset_count = inits.amount; // Block request length
     uint32 offset = inits.file_offset; // Block request start point
     
-    memset(buffer, 0x00, BUFF_LEN_FULL);
-    read_requested(offset, buffer, offset_count);
+    memset(module_buffer, 0x00, BUFF_LEN_FULL);
+    read_requested(offset, module_buffer, offset_count);
     
-    files.buf = buffer; // substitute buffer address which have file info
+    files.buf = module_buffer; // substitute buffer address which have file info
     files.nread = inits.amount; // substitute buffer length which have file info
     
-    if(ioctl(fd, RETURN_FILE, &files) < 0)
+    if(ioctl(module_fd, RETURN_FILE, &files) < 0)
         printf("Error in IOCTL2 errno: %d\n", errno);
 }
 
