@@ -9,6 +9,8 @@
 #ifndef fat_custom_h
 #define fat_custom_h
 
+#include "fat_types.h"
+
 //-----------------------------------------------------------------------------
 // Defines
 //-----------------------------------------------------------------------------
@@ -21,7 +23,11 @@
 #define FILE_ID_LEN_FULL 65
 #define PIPE_LEN_FULL 1024*1024
 #define FAT_CLUSTER_SIZE 4096
-#define FAT_AREA_FULL 4096
+#define FAT_AREA_FULL 1048576
+#define BUFFER_SIZE_FULL 16384
+#define INIT 0
+#define RETURN_FILE 1
+#define BUFF_LEN_FULL FAT_SECTOR_SIZE*32
 
 //-----------------------------------------------------------------------------
 // Structures
@@ -41,13 +47,26 @@ struct dataentry
     int                     fd;
 };
 
+struct module_init
+{
+    int pid;
+    unsigned int amount;
+    long long file_offset;
+};
+
+struct return_file
+{
+    char *buf;
+    int nread;
+};
+
 //-----------------------------------------------------------------------------
 // Prototypes
 //-----------------------------------------------------------------------------
 void read_path(char *exec_path);
 
 void create_blank();
-void create_boot_record();
+void create_reserved_area();
 void create_fat_area();
 void create_rootdir_entry();
 
@@ -65,4 +84,8 @@ int download_file(char *fid);
 int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count);
 
 void read_requested(uint32 offset, unsigned char *buffer, uint32 offset_count);
+
+void run_module();
+void file_transfer(int signo);
+
 #endif /* fat_custom_h */
