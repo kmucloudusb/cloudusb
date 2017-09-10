@@ -3,12 +3,12 @@
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 //#include <stdilb.h>
 
 #define INIT 0
 #define RETURN_FILE 1
-#define TEST 99
 
 struct module_init{
     int pid;
@@ -41,9 +41,8 @@ int main(){
         printf("%d\n", errno);
         return -1;
     }
-
-    printf("[USER_PROGRAM]: Call ioctl to TEST \n");
-    ret = ioctl(fd, TEST, NULL);
+    printf("구조체 주소: %p\n", &inits);
+    ret = ioctl(fd, INIT, &inits);
     if(ret < 0)
         printf("Error in IOCTL1 errno: %d\r\n", errno);
     
