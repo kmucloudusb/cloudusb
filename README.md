@@ -1,3 +1,3 @@
-# cloudusb e...
+# cloudusb
 [![Build Status](https://travis-ci.org/kmucloudusb/cloudeusb.svg?branch=master)](https://travis-ci.org/kmucloudusb/cloudeusb)
 kookmin univ computer science capstone design
