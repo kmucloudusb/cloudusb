@@ -17,13 +17,12 @@ file_id = ''
 try:
     import argparse
 
-    tools.argparser.add_argument('--down', default='-1', help='file id')
+    tools.argparser.add_argument('--fid', default='-1', help='file id')
 
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
 
-    if flags.down:
-        file_id = flags.down
-
+    if flags.fid:
+        file_id = flags.fid
 
 except ImportError:
     flags = None
