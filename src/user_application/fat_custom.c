@@ -48,7 +48,7 @@ void read_path(char *exec_path)
     strcpy(_script_path, exec_path);
     strcpy(_pipe_path, exec_path);
     
-    strcpy(&(_script_path[strlen(_script_path)-8]), "../googledrive/list/list.py");
+    strcpy(&(_script_path[strlen(_script_path)-8]), "../src/googledrive/list/list.py");
     strcpy(&(_pipe_path[strlen(_pipe_path)-8]), "myfifo");
 }
 
