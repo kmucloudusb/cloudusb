@@ -48,7 +48,7 @@
 static FL_FILE            _files[FATFS_MAX_OPEN_FILES];
 static int                _filelib_init = 0;
 static int                _filelib_valid = 0;
-struct fatfs              _fs;
+struct fatfs              fs;
 static struct fat_list    _open_file_list;
 static struct fat_list    _free_file_list;
 
@@ -133,7 +133,7 @@ static int _open_directory(char *path, uint32 *pathCluster)
     uint32 startcluster;
     
     // Set starting cluster to root cluster
-    startcluster = fatfs_get_root_cluster(&_fs);
+    startcluster = fatfs_get_root_cluster(&fs);
     
     // Find number of levels
     levels = fatfs_total_path_levels(path);
@@ -145,7 +145,7 @@ static int _open_directory(char *path, uint32 *pathCluster)
             return 0;
         
         // Find clusteraddress for folder (currentfolder)
-        if (fatfs_get_file_entry(&_fs, startcluster, currentfolder,&sfEntry))
+        if (fatfs_get_file_entry(&fs, startcluster, currentfolder,&sfEntry))
         {
             // Check entry is folder
             if (fatfs_entry_is_dir(&sfEntry))
@@ -197,7 +197,7 @@ static int _create_directory(char *path)
     
     // If file is in the root dir
     if (file->path[0] == 0)
-        file->parentcluster = fatfs_get_root_cluster(&_fs);
+        file->parentcluster = fatfs_get_root_cluster(&fs);
     else
     {
         // Find parent directory start cluster
@@ -209,7 +209,7 @@ static int _create_directory(char *path)
     }
     
     // Check if same filename exists in directory
-    if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename,&sfEntry) == 1)
+    if (fatfs_get_file_entry(&fs, file->parentcluster, file->filename,&sfEntry) == 1)
     {
         _free_file(file);
         return 0;
@@ -218,7 +218,7 @@ static int _create_directory(char *path)
     file->startcluster = 0;
     
     // Create the file space for the folder (at least one clusters worth!)
-    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, 1))
+    if (!fatfs_allocate_free_space(&fs, 1, &file->startcluster, 1))
     {
         _free_file(file);
         return 0;
@@ -226,9 +226,9 @@ static int _create_directory(char *path)
     
     // Erase new directory cluster
     memset(file->file_data_sector, 0x00, FAT_SECTOR_SIZE);
-    for (i=0;i<_fs.sectors_per_cluster;i++)
+    for (i=0;i<fs.sectors_per_cluster;i++)
     {
-        if (!fatfs_write_sector(&_fs, file->startcluster, i, file->file_data_sector))
+        if (!fatfs_write_sector(&fs, file->startcluster, i, file->file_data_sector))
         {
             _free_file(file);
             return 0;
@@ -252,7 +252,7 @@ static int _create_directory(char *path)
             memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
         
         // Check if entry exists already or not
-        if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename) == 0)
+        if (fatfs_sfn_exists(&fs, file->parentcluster, (char*)file->shortfilename) == 0)
             break;
         
         tailNum++;
@@ -263,7 +263,7 @@ static int _create_directory(char *path)
     if (tailNum == 9999)
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return 0;
@@ -273,7 +273,7 @@ static int _create_directory(char *path)
     if (!fatfs_lfn_create_sfn(shortFilename, file->filename))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return 0;
@@ -283,10 +283,10 @@ static int _create_directory(char *path)
     memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
     
     // Check if entry exists already
-    if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename))
+    if (fatfs_sfn_exists(&fs, file->parentcluster, (char*)file->shortfilename))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return 0;
@@ -294,10 +294,10 @@ static int _create_directory(char *path)
 #endif
     
     // Add file to disk
-    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, 0, 1))
+    if (!fatfs_add_file_entry(&fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, 0, 1))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return 0;
@@ -314,7 +314,7 @@ static int _create_directory(char *path)
     file->last_fat_lookup.ClusterIdx = 0xFFFFFFFF;
     file->last_fat_lookup.CurrentCluster = 0xFFFFFFFF;
     
-    fatfs_fat_purge(&_fs);
+    fatfs_fat_purge(&fs);
     
     _free_file(file);
     return 1;
@@ -353,7 +353,7 @@ static FL_FILE* _open_file(const char *path)
     
     // If file is in the root dir
     if (file->path[0]==0)
-        file->parentcluster = fatfs_get_root_cluster(&_fs);
+        file->parentcluster = fatfs_get_root_cluster(&fs);
     else
     {
         // Find parent directory start cluster
@@ -365,7 +365,7 @@ static FL_FILE* _open_file(const char *path)
     }
     
     // Using dir cluster address search for filename
-    if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename,&sfEntry))
+    if (fatfs_get_file_entry(&fs, file->parentcluster, file->filename,&sfEntry))
         // Make sure entry is file not dir!
         if (fatfs_entry_is_file(&sfEntry))
         {
@@ -382,9 +382,9 @@ static FL_FILE* _open_file(const char *path)
             file->last_fat_lookup.ClusterIdx = 0xFFFFFFFF;
             file->last_fat_lookup.CurrentCluster = 0xFFFFFFFF;
             
-            fatfs_cache_init(&_fs, file);
+            fatfs_cache_init(&fs, file);
             
-            fatfs_fat_purge(&_fs);
+            fatfs_fat_purge(&fs);
             
             return file;
         }
@@ -404,7 +404,7 @@ static FL_FILE* _create_file(const char *filename)
     int tailNum = 0;
     
     // No write access?
-    if (!_fs.disk_io.write_media)
+    if (!fs.disk_io.write_media)
         return NULL;
     
     // Allocate a new file handle
@@ -432,7 +432,7 @@ static FL_FILE* _create_file(const char *filename)
     
     // If file is in the root dir
     if (file->path[0] == 0)
-        file->parentcluster = fatfs_get_root_cluster(&_fs);
+        file->parentcluster = fatfs_get_root_cluster(&fs);
     else
     {
         // Find parent directory start cluster
@@ -444,7 +444,7 @@ static FL_FILE* _create_file(const char *filename)
     }
     
     // Check if same filename exists in directory
-    if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename,&sfEntry) == 1)
+    if (fatfs_get_file_entry(&fs, file->parentcluster, file->filename,&sfEntry) == 1)
     {
         _free_file(file);
         return NULL;
@@ -453,7 +453,7 @@ static FL_FILE* _create_file(const char *filename)
     file->startcluster = 0;
     
     // Create the file space for the file (at least one clusters worth!)
-    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, 1))
+    if (!fatfs_allocate_free_space(&fs, 1, &file->startcluster, 1))
     {
         _free_file(file);
         return NULL;
@@ -475,7 +475,7 @@ static FL_FILE* _create_file(const char *filename)
             memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
         
         // Check if entry exists already or not
-        if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename) == 0)
+        if (fatfs_sfn_exists(&fs, file->parentcluster, (char*)file->shortfilename) == 0)
             break;
         
         tailNum++;
@@ -486,7 +486,7 @@ static FL_FILE* _create_file(const char *filename)
     if (tailNum == 9999)
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return NULL;
@@ -496,7 +496,7 @@ static FL_FILE* _create_file(const char *filename)
     if (!fatfs_lfn_create_sfn(shortFilename, file->filename))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return NULL;
@@ -506,10 +506,10 @@ static FL_FILE* _create_file(const char *filename)
     memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
     
     // Check if entry exists already
-    if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename))
+    if (fatfs_sfn_exists(&fs, file->parentcluster, (char*)file->shortfilename))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return NULL;
@@ -517,10 +517,10 @@ static FL_FILE* _create_file(const char *filename)
 #endif
     
     // Add file to disk
-    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, 0, 0))
+    if (!fatfs_add_file_entry(&fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, 0, 0))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return NULL;
@@ -537,9 +537,9 @@ static FL_FILE* _create_file(const char *filename)
     file->last_fat_lookup.ClusterIdx = 0xFFFFFFFF;
     file->last_fat_lookup.CurrentCluster = 0xFFFFFFFF;
     
-    fatfs_cache_init(&_fs, file);
+    fatfs_cache_init(&fs, file);
     
-    fatfs_fat_purge(&_fs);
+    fatfs_fat_purge(&fs);
     
     return file;
 }
@@ -556,12 +556,12 @@ static uint32 _read_sectors(FL_FILE* file, uint32 offset, uint8 *buffer, uint32 
     uint32 lba;
     
     // Find cluster index within file & sector with cluster
-    ClusterIdx = offset / _fs.sectors_per_cluster;
-    Sector = offset - (ClusterIdx * _fs.sectors_per_cluster);
+    ClusterIdx = offset / fs.sectors_per_cluster;
+    Sector = offset - (ClusterIdx * fs.sectors_per_cluster);
     
     // Limit number of sectors read to the number remaining in this cluster
-    if ((Sector + count) > _fs.sectors_per_cluster)
-        count = _fs.sectors_per_cluster - Sector;
+    if ((Sector + count) > fs.sectors_per_cluster)
+        count = fs.sectors_per_cluster - Sector;
     
     // Quick lookup for next link in the chain
     if (ClusterIdx == file->last_fat_lookup.ClusterIdx)
@@ -589,13 +589,13 @@ static uint32 _read_sectors(FL_FILE* file, uint32 offset, uint8 *buffer, uint32 
             uint32 nextCluster;
             
             // Does the entry exist in the cache?
-            if (!fatfs_cache_get_next_cluster(&_fs, file, i, &nextCluster))
+            if (!fatfs_cache_get_next_cluster(&fs, file, i, &nextCluster))
             {
                 // Scan file linked list to find next entry
-                nextCluster = fatfs_find_next_cluster(&_fs, Cluster);
+                nextCluster = fatfs_find_next_cluster(&fs, Cluster);
                 
                 // Push entry into cache
-                fatfs_cache_set_next_cluster(&_fs, file, i, nextCluster);
+                fatfs_cache_set_next_cluster(&fs, file, i, nextCluster);
             }
             
             Cluster = nextCluster;
@@ -614,10 +614,10 @@ static uint32 _read_sectors(FL_FILE* file, uint32 offset, uint8 *buffer, uint32 
         return 0;
     
     // Calculate sector address
-    lba = fatfs_lba_of_cluster(&_fs, Cluster) + Sector;
+    lba = fatfs_lba_of_cluster(&fs, Cluster) + Sector;
     
     // Read sector of file
-    if (fatfs_sector_read(&_fs, lba, buffer, count))
+    if (fatfs_sector_read(&fs, lba, buffer, count))
         return count;
     else
         return 0;
@@ -648,8 +648,8 @@ void fl_init(void)
 //-----------------------------------------------------------------------------
 void fl_attach_locks(void (*lock)(void), void (*unlock)(void))
 {
-    _fs.fl_lock = lock;
-    _fs.fl_unlock = unlock;
+    fs.fl_lock = lock;
+    fs.fl_unlock = unlock;
 }
 //-----------------------------------------------------------------------------
 // fl_attach_media:
@@ -661,13 +661,13 @@ int fl_attach_media(fn_diskio_read rd, fn_diskio_write wr)
     // If first call to library, initialise
     CHECK_FL_INIT();
     
-    _fs.disk_io.read_media = rd;
-    _fs.disk_io.write_media = wr;
+    fs.disk_io.read_media = rd;
+    fs.disk_io.write_media = wr;
     
     // Initialise FAT parameters
-    if ((res = fatfs_init(&_fs)) != FAT_INIT_OK)
+    if ((res = fatfs_init(&fs)) != FAT_INIT_OK)
     {
-        FAT_PRINTF(("FAT_FS: Error could not load FAT details (%d)!\r\n", res));
+        FAT_PRINTF(("FATfs: Error could not load FAT details (%d)!\r\n", res));
         return res;
     }
     
@@ -682,9 +682,9 @@ void fl_shutdown(void)
     // If first call to library, initialise
     CHECK_FL_INIT();
     
-    FL_LOCK(&_fs);
-    fatfs_fat_purge(&_fs);
-    FL_UNLOCK(&_fs);
+    FL_LOCK(&fs);
+    fatfs_fat_purge(&fs);
+    FL_UNLOCK(&fs);
 }
 //-----------------------------------------------------------------------------
 // fopen: Open or Create a file for reading or writing
@@ -774,10 +774,10 @@ void* fl_fopen(const char *path, const char *mode)
 #endif
     
     // No write access - remove write/modify flags
-    if (!_fs.disk_io.write_media)
+    if (!fs.disk_io.write_media)
         flags &= ~(FILE_CREATE | FILE_WRITE | FILE_APPEND);
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
     // Read
     if (flags & FILE_READ)
@@ -798,7 +798,7 @@ void* fl_fopen(const char *path, const char *mode)
     if (file)
         file->flags = flags;
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     return file;
 }
 //-----------------------------------------------------------------------------
@@ -816,12 +816,12 @@ static uint32 _write_sectors(FL_FILE* file, uint32 offset, uint8 *buf, uint32 co
     uint32 TotalWriteCount = count;
     
     // Find values for Cluster index & sector within cluster
-    ClusterIdx = offset / _fs.sectors_per_cluster;
-    SectorNumber = offset - (ClusterIdx * _fs.sectors_per_cluster);
+    ClusterIdx = offset / fs.sectors_per_cluster;
+    SectorNumber = offset - (ClusterIdx * fs.sectors_per_cluster);
     
     // Limit number of sectors written to the number remaining in this cluster
-    if ((SectorNumber + count) > _fs.sectors_per_cluster)
-        count = _fs.sectors_per_cluster - SectorNumber;
+    if ((SectorNumber + count) > fs.sectors_per_cluster)
+        count = fs.sectors_per_cluster - SectorNumber;
     
     // Quick lookup for next link in the chain
     if (ClusterIdx == file->last_fat_lookup.ClusterIdx)
@@ -849,13 +849,13 @@ static uint32 _write_sectors(FL_FILE* file, uint32 offset, uint8 *buf, uint32 co
             uint32 nextCluster;
             
             // Does the entry exist in the cache?
-            if (!fatfs_cache_get_next_cluster(&_fs, file, i, &nextCluster))
+            if (!fatfs_cache_get_next_cluster(&fs, file, i, &nextCluster))
             {
                 // Scan file linked list to find next entry
-                nextCluster = fatfs_find_next_cluster(&_fs, Cluster);
+                nextCluster = fatfs_find_next_cluster(&fs, Cluster);
                 
                 // Push entry into cache
-                fatfs_cache_set_next_cluster(&_fs, file, i, nextCluster);
+                fatfs_cache_set_next_cluster(&fs, file, i, nextCluster);
             }
             
             LastCluster = Cluster;
@@ -870,7 +870,7 @@ static uint32 _write_sectors(FL_FILE* file, uint32 offset, uint8 *buf, uint32 co
         if (Cluster == FAT32_LAST_CLUSTER)
         {
             // Add some more cluster(s) to the last good cluster chain
-            if (!fatfs_add_free_space(&_fs, &LastCluster,  (TotalWriteCount + _fs.sectors_per_cluster -1) / _fs.sectors_per_cluster))
+            if (!fatfs_add_free_space(&fs, &LastCluster,  (TotalWriteCount + fs.sectors_per_cluster -1) / fs.sectors_per_cluster))
                 return 0;
             
             Cluster = LastCluster;
@@ -882,9 +882,9 @@ static uint32 _write_sectors(FL_FILE* file, uint32 offset, uint8 *buf, uint32 co
     }
     
     // Calculate write address
-    lba = fatfs_lba_of_cluster(&_fs, Cluster) + SectorNumber;
+    lba = fatfs_lba_of_cluster(&fs, Cluster) + SectorNumber;
     
-    if (fatfs_sector_write(&_fs, lba, buf, count))
+    if (fatfs_sector_write(&fs, lba, buf, count))
         return count;
     else
         return 0;
@@ -903,7 +903,7 @@ int fl_fflush(void *f)
     
     if (file)
     {
-        FL_LOCK(&_fs);
+        FL_LOCK(&fs);
         
         // If some write data still in buffer
         if (file->file_data_dirty)
@@ -913,7 +913,7 @@ int fl_fflush(void *f)
                 file->file_data_dirty = 0;
         }
         
-        FL_UNLOCK(&_fs);
+        FL_UNLOCK(&fs);
     }
 #endif
     return 0;
@@ -930,7 +930,7 @@ void fl_fclose(void *f)
     
     if (file)
     {
-        FL_LOCK(&_fs);
+        FL_LOCK(&fs);
         
         // Flush un-written data to file
         fl_fflush(f);
@@ -940,7 +940,7 @@ void fl_fclose(void *f)
         {
 #if FATFS_INC_WRITE_SUPPORT
             // Update filesize in directory
-            fatfs_update_file_length(&_fs, file->parentcluster, (char*)file->shortfilename, file->filelength);
+            fatfs_update_file_length(&fs, file->parentcluster, (char*)file->shortfilename, file->filelength);
 #endif
             file->filelength_changed = 0;
         }
@@ -955,9 +955,9 @@ void fl_fclose(void *f)
         // Free file handle
         _free_file(file);
         
-        fatfs_fat_purge(&_fs);
+        fatfs_fat_purge(&fs);
         
-        FL_UNLOCK(&_fs);
+        FL_UNLOCK(&fs);
     }
 }
 //-----------------------------------------------------------------------------
@@ -1110,9 +1110,9 @@ int fl_fread(void * buffer, int size, int length, void *f )
     return bytesRead;
 }
 //-----------------------------------------------------------------------------
-// fl_fseek: Seek to a specific place in the file
+// flfseek: Seek to a specific place in the file
 //-----------------------------------------------------------------------------
-int fl_fseek( void *f, long offset, int origin )
+int flfseek( void *f, long offset, int origin )
 {
     FL_FILE *file = (FL_FILE *)f;
     int res = -1;
@@ -1126,7 +1126,7 @@ int fl_fseek( void *f, long offset, int origin )
     if (origin == SEEK_END && offset != 0)
         return -1;
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
     // Invalidate file buffer
     file->file_data_address = 0xFFFFFFFF;
@@ -1174,7 +1174,7 @@ int fl_fseek( void *f, long offset, int origin )
     else
         res = -1;
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     
     return res;
 }
@@ -1188,12 +1188,12 @@ int fl_fgetpos(void *f , uint32 * position)
     if (!file)
         return -1;
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
     // Get position
     *position = file->bytenum;
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     
     return 0;
 }
@@ -1219,14 +1219,14 @@ int fl_feof(void *f)
     if (!file)
         return -1;
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
     if (file->bytenum == file->filelength)
         res = EOF;
     else
         res = 0;
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     
     return res;
 }
@@ -1266,12 +1266,12 @@ int fl_fwrite(const void * data, int size, int count, void *f )
     if (!file)
         return -1;
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
     // No write permissions
     if (!(file->flags & FILE_WRITE))
     {
-        FL_UNLOCK(&_fs);
+        FL_UNLOCK(&fs);
         return -1;
     }
     
@@ -1388,7 +1388,7 @@ int fl_fwrite(const void * data, int size, int count, void *f )
     file->filelength_changed = 1;
 #endif
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     
     return (size*count);
 }
@@ -1417,17 +1417,17 @@ int fl_remove( const char * filename )
     FL_FILE* file;
     int res = -1;
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
     // Use read_file as this will check if the file is already open!
     file = fl_fopen((char*)filename, "r");
     if (file)
     {
         // Delete allocated space
-        if (fatfs_free_cluster_chain(&_fs, file->startcluster))
+        if (fatfs_free_cluster_chain(&fs, file->startcluster))
         {
             // Remove directory entries
-            if (fatfs_mark_file_deleted(&_fs, file->parentcluster, (char*)file->shortfilename))
+            if (fatfs_mark_file_deleted(&fs, file->parentcluster, (char*)file->shortfilename))
             {
                 // Close the file handle (this should not write anything to the file
                 // as we have not changed the file since opening it!)
@@ -1438,7 +1438,7 @@ int fl_remove( const char * filename )
         }
     }
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     
     return res;
 }
@@ -1454,9 +1454,9 @@ int fl_createdirectory(const char *path)
     // If first call to library, initialise
     CHECK_FL_INIT();
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     res =_create_directory((char*)path);
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     
     return res;
 }
@@ -1472,7 +1472,7 @@ void fl_listdirectory(const char *path)
     // If first call to library, initialise
     CHECK_FL_INIT();
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
     FAT_PRINTF(("\r\nDirectory %s\r\n", path));
     
@@ -1502,7 +1502,7 @@ void fl_listdirectory(const char *path)
         fl_closedir(&dirstat);
     }
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
 }
 #endif
 //-----------------------------------------------------------------------------
@@ -1518,21 +1518,21 @@ FL_DIR* fl_opendir(const char* path, FL_DIR *dir)
     // If first call to library, initialise
     CHECK_FL_INIT();
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
     levels = fatfs_total_path_levels((char*)path) + 1;
     
     // If path is in the root dir
     if (levels == 0)
-        cluster = fatfs_get_root_cluster(&_fs);
+        cluster = fatfs_get_root_cluster(&fs);
     // Find parent directory start cluster
     else
         res = _open_directory((char*)path, &cluster);
     
     if (res)
-        fatfs_list_directory_start(&_fs, dir, cluster);
+        fatfs_list_directory_start(&fs, dir, cluster);
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     
     return cluster != FAT32_INVALID_CLUSTER ? dir : 0;
 }
@@ -1548,11 +1548,11 @@ int fl_readdir(FL_DIR *dirls, fl_dirent *entry)
     // If first call to library, initialise
     CHECK_FL_INIT();
     
-    FL_LOCK(&_fs);
+    FL_LOCK(&fs);
     
-    res = fatfs_list_directory_next(&_fs, dirls, entry);
+    res = fatfs_list_directory_next(&fs, dirls, entry);
     
-    FL_UNLOCK(&_fs);
+    FL_UNLOCK(&fs);
     
     return res ? 0 : -1;
 }
@@ -1591,16 +1591,16 @@ int fl_is_dir(const char *path)
 #if FATFS_INC_FORMAT_SUPPORT
 int fl_format(uint32 volume_sectors, const char *name)
 {
-    return fatfs_format(&_fs, volume_sectors, name);
+    return fatfs_format(&fs, volume_sectors, name);
 }
 #endif /*FATFS_INC_FORMAT_SUPPORT*/
 //-----------------------------------------------------------------------------
-// fl_get_fs:
+// fl_getfs:
 //-----------------------------------------------------------------------------
 #ifdef FATFS_INC_TEST_HOOKS
-struct fatfs* fl_get_fs(void)
+struct fatfs* fl_getfs(void)
 {
-    return &_fs;
+    return &fs;
 }
 #endif
 
@@ -1615,7 +1615,7 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
     int i;
     
     // No write access?
-    if (!_fs.disk_io.write_media)
+    if (!fs.disk_io.write_media)
         return 0;
     
     // Allocate a new file handle
@@ -1643,7 +1643,7 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
     
     // If file is in the root dir
     if (file->path[0] == 0)
-        file->parentcluster = fatfs_get_root_cluster(&_fs);
+        file->parentcluster = fatfs_get_root_cluster(&fs);
     else
     {
         // Find parent directory start cluster
@@ -1655,7 +1655,7 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
     }
     
     // Check if same filename exists in directory
-    if (fatfs_get_file_entry(&_fs, file->parentcluster, file->filename,&sfEntry) == 1)
+    if (fatfs_get_file_entry(&fs, file->parentcluster, file->filename,&sfEntry) == 1)
     {
         _free_file(file);
         return 0;
@@ -1664,7 +1664,7 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
     file->startcluster = 0;
     
     // Create the file space for the file (at least one clusters worth!)
-    if (!fatfs_allocate_free_space(&_fs, 1, &file->startcluster, fsize))
+    if (!fatfs_allocate_free_space(&fs, 1, &file->startcluster, fsize))
     {
         _free_file(file);
         return 0;
@@ -1676,9 +1676,9 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
         create_direntry(file->startcluster);
         
         memset(file->file_data_sector, 0x00, FAT_SECTOR_SIZE);
-        for (i=0;i<_fs.sectors_per_cluster;i++)
+        for (i=0;i<fs.sectors_per_cluster;i++)
         {
-            if (!fatfs_write_sector(&_fs, file->startcluster, i, file->file_data_sector))
+            if (!fatfs_write_sector(&fs, file->startcluster, i, file->file_data_sector))
             {
                 _free_file(file);
                 return 0;
@@ -1704,7 +1704,7 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
             memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
         
         // Check if entry exists already or not
-        if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename) == 0)
+        if (fatfs_sfn_exists(&fs, file->parentcluster, (char*)file->shortfilename) == 0)
             break;
         
         tailNum++;
@@ -1715,7 +1715,7 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
     if (tailNum == 9999)
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return 0;
@@ -1725,7 +1725,7 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
     if (!fatfs_lfn_create_sfn(shortFilename, file->filename))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return 0;
@@ -1735,10 +1735,10 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
     memcpy(file->shortfilename, shortFilename, FAT_SFN_SIZE_FULL);
     
     // Check if entry exists already
-    if (fatfs_sfn_exists(&_fs, file->parentcluster, (char*)file->shortfilename))
+    if (fatfs_sfn_exists(&fs, file->parentcluster, (char*)file->shortfilename))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return 0;
@@ -1746,10 +1746,10 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
 #endif
     
     // Add file to disk
-    if (!fatfs_add_file_entry(&_fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, fsize, dir))
+    if (!fatfs_add_file_entry(&fs, file->parentcluster, (char*)file->filename, (char*)file->shortfilename, file->startcluster, fsize, dir))
     {
         // Delete allocated space
-        fatfs_free_cluster_chain(&_fs, file->startcluster);
+        fatfs_free_cluster_chain(&fs, file->startcluster);
         
         _free_file(file);
         return 0;
@@ -1766,9 +1766,9 @@ uint32 write_entry(char *filename, uint32 fsize, char *fid, int dir)
     file->last_fat_lookup.ClusterIdx = 0xFFFFFFFF;
     file->last_fat_lookup.CurrentCluster = 0xFFFFFFFF;
     
-    fatfs_cache_init(&_fs, file);
+    fatfs_cache_init(&fs, file);
     
-    fatfs_fat_purge(&_fs);
+    fatfs_fat_purge(&fs);
     
     startcluster = file->startcluster;
     _free_file(file);

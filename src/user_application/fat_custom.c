@@ -21,7 +21,7 @@
 //-----------------------------------------------------------------------------
 // Globals
 //-----------------------------------------------------------------------------
-extern struct fatfs _fs;
+extern struct fatfs fs;
 
 struct direntry *_direntries[DIR_ENTRY_TABLE_FULL];
 struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
@@ -54,7 +54,7 @@ void read_path(char *exec_path)
 
 void create_rootdir_entry()
 {
-    create_direntry(_fs.rootdir_first_cluster);
+    create_direntry(fs.rootdir_first_cluster);
 }
 
 int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
@@ -79,19 +79,19 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         }
         
         // (FAT area)
-        else if ((_fs.fat_begin_lba <= sector_loc && sector_loc < _fs.fat_begin_lba +_fs.fat_sectors) ||
-                 (_fs.fat_begin_lba + _fs.fat_sectors <= sector_loc && sector_loc < _fs.fat_begin_lba + 2*_fs.fat_sectors))
+        else if ((fs.fat_begin_lba <= sector_loc && sector_loc < fs.fat_begin_lba +fs.fat_sectors) ||
+                 (fs.fat_begin_lba + fs.fat_sectors <= sector_loc && sector_loc < fs.fat_begin_lba + 2*fs.fat_sectors))
         {
-            unsigned long loc = (sector_loc - _fs.fat_begin_lba) * FAT_SECTOR_SIZE;
+            unsigned long loc = (sector_loc - fs.fat_begin_lba) * FAT_SECTOR_SIZE;
             
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _fat_area + loc, FAT_SECTOR_SIZE);
         }
         
         // (Directory entry & Data entry)
-        else if (sector_loc >= _fs.rootdir_first_sector)
+        else if (sector_loc >= fs.rootdir_first_sector)
         {
             unsigned long i;
-            unsigned long cluster = (sector_loc - _fs.rootdir_first_sector)/_fs.sectors_per_cluster + _fs.rootdir_first_cluster;
+            unsigned long cluster = (sector_loc - fs.rootdir_first_sector)/fs.sectors_per_cluster + fs.rootdir_first_cluster;
             
             // Search directory entry cluster table
             for (i=0; i<DIR_ENTRY_TABLE_FULL; ++i)
@@ -103,7 +103,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 {
                     // Location in cluster
                     // Do not touch it it's my masterpiece
-                    unsigned long loc = ((sector_loc - _fs.rootdir_first_sector) % _fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
+                    unsigned long loc = ((sector_loc - fs.rootdir_first_sector) % fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
                     
                     memcpy(buffer, _direntries[i]->entry + loc, (sector_count-read_count) * FAT_SECTOR_SIZE);
                     
@@ -125,8 +125,8 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 {
                     // Download from Google drive & Open & Read
                     unsigned long loc;
-                    loc = (sector_loc - _fs.rootdir_first_sector);
-                    loc -= (_dataentries[i]->startcluster - _fs.rootdir_first_cluster) * _fs.sectors_per_cluster;
+                    loc = (sector_loc - fs.rootdir_first_sector);
+                    loc -= (_dataentries[i]->startcluster - fs.rootdir_first_cluster) * fs.sectors_per_cluster;
                     
                     // Is downloaded?
                     if(!_dataentries[i]->download)
@@ -172,9 +172,9 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     }
     
     // (FAT area)
-    else if(_fs.fat_begin_lba <= sector && sector < _fs.rootdir_first_sector)
+    else if(fs.fat_begin_lba <= sector && sector < fs.rootdir_first_sector)
     {
-        unsigned long loc = (sector - _fs.fat_begin_lba) % _fs.fat_sectors * FAT_SECTOR_SIZE;
+        unsigned long loc = (sector - fs.fat_begin_lba) % fs.fat_sectors * FAT_SECTOR_SIZE;
         
         memcpy(_fat_area + loc, buffer, sector_count * FAT_SECTOR_SIZE);
     }
@@ -185,8 +185,8 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         unsigned long i;
         
         // Location in cluster
-        unsigned long loc = (sector - _fs.rootdir_first_sector) % _fs.sectors_per_cluster * FAT_SECTOR_SIZE;
-        unsigned long cluster = (sector - _fs.rootdir_first_sector) / _fs.sectors_per_cluster + _fs.rootdir_first_cluster;
+        unsigned long loc = (sector - fs.rootdir_first_sector) % fs.sectors_per_cluster * FAT_SECTOR_SIZE;
+        unsigned long cluster = (sector - fs.rootdir_first_sector) / fs.sectors_per_cluster + fs.rootdir_first_cluster;
         
         // Search directory entry table
         for (i=0; i<DIR_ENTRY_TABLE_FULL; ++i)
@@ -253,7 +253,7 @@ int create_direntry(uint32 startcluster)
         {
             _direntries[i] = (struct direntry*) malloc(sizeof(struct direntry));
             
-            memset(_direntries[i], 0x00, sizeof(unsigned char)*FAT_SECTOR_SIZE*_fs.sectors_per_cluster);
+            memset(_direntries[i], 0x00, sizeof(unsigned char)*FAT_SECTOR_SIZE*fs.sectors_per_cluster);
             
             _direntries[i]->cluster = startcluster;
             
