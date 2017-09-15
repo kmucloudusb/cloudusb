@@ -1,13 +1,23 @@
 #include "connModule.h"
 
-int cloud_flag = 1;
-unsigned int		amount = 0;
-loff_t			file_offset = 0;
-ssize_t			nread = 0;
-char __user *buff;
+int cloud_flag = WAIT_HOST;
+
+/* read */
+unsigned int read_amount = 0;
+char __user *read_buff = NULL;
+loff_t read_file_offset = 0;
+ssize_t	nread = 0;
+
+
+/* write */
+unsigned int write_amount = 0;
+char __user *write_buff = NULL;
+loff_t write_file_offset = 0;
+ssize_t nwritten = 0;
+
 
 /* for block request */
-struct module_init *inits;
+struct request *req;
 struct return_file *files;
 
 /* for signal */
@@ -16,10 +26,16 @@ struct siginfo info;
 int user_pid;
 
 EXPORT_SYMBOL(cloud_flag);
-EXPORT_SYMBOL(amount);
-EXPORT_SYMBOL(file_offset);
+
+EXPORT_SYMBOL(read_amount);
+EXPORT_SYMBOL(read_buff);
+EXPORT_SYMBOL(read_file_offset);
 EXPORT_SYMBOL(nread);
-EXPORT_SYMBOL(buff);
+
+EXPORT_SYMBOL(write_amount);
+EXPORT_SYMBOL(write_buff);
+EXPORT_SYMBOL(write_file_offset);
+EXPORT_SYMBOL(nwritten);
 
 /*-------------------------------------------------------------------------*/
 
@@ -40,8 +56,8 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     {
         case INIT:
             printk(KERN_ALERT "CloudUSB_con ioctl get INIT\n");
-            inits = (struct module_init *)(arg);
-            user_pid = inits->pid;
+            req = (struct request *)(arg);
+            user_pid = req->pid;
             memset(&info, 0 ,sizeof(struct siginfo));
             info.si_signo = SIGUSR1;
             info.si_code = SI_QUEUE;
@@ -58,19 +74,19 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         case RETURN_FILE:
             printk(KERN_ALERT "CloudUSB_con ioctl get RETURN_FILE\n");
             files = (struct return_file *)(arg);
-            printk(KERN_ALERT "CloudUSB_con received file_buf: %p\n", files->buf);
+            printk(KERN_ALERT "CloudUSB_con received file_buff: %p\n", files->buff);
             printk(KERN_ALERT "CloudUSB_con received file_nread: %d\n", files->nread);
             printk(KERN_ALERT "CloudUSB_con received file_content: ");
             int i;
             for(i=0;i<files->nread;i++){
-                printk(KERN_CONT "%02x ", files->buf[i]);
+                printk(KERN_CONT "%02x ", files->buff[i]);
             }
             printk(KERN_ALERT "\n");
+            
             /* wait for logging */
             msleep(100);
             
-            memcpy(buff, files->buf, files->nread);
-            
+            memcpy(read_buff, files->buff, files->nread);
             nread = files->nread;
             cloud_flag = 0;
             break;
@@ -79,17 +95,39 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     }
     printk(KERN_ALERT "CloudUSB wait next block request.\n");
     
-    /* wait because of context problem */
+    /* wait because of context problem, no race condition */
     while(!cloud_flag){schedule_timeout_uninterruptible(0.001*HZ);}
     
     /* set block request struct and send signal */
     printk(KERN_ALERT "CloudUSB_con receive block request(after wait)\n");
-    inits->amount = amount;
-    inits->file_offset = file_offset;
-    printk(KERN_ALERT "CloudUSB_con request file_offset: %lld\n", inits->file_offset);
-    printk(KERN_ALERT "CloudUSB_con request amount: %u\n", inits->amount);
-    send_sig_info(SIGUSR1, &info, t);
+    if(cloud_flag == EXECUTE_READ)
+        perform_read(req, &info, t);
+    else
+        perform_write(req, &info, t);
+    
     return 0;
+}
+
+void perform_read(struct request *req, struct siginfo *info, struct task_struct *t){
+    printk(KERN_ALERT "CloudUSB_con request read_file_offset: %lld\n", req->read_file_offset);
+    printk(KERN_ALERT "CloudUSB_con request read_amount: %u\n", req->read_amount);
+    
+    req->read_file_offset = read_file_offset;
+    req->read_amount = read_amount;
+    
+    send_sig_info(SIGUSR1, info, t);
+}
+
+void perform_write(struct request *req, struct siginfo *info, struct task_struct *t){
+    printk(KERN_ALERT "CloudUSB_con request write_file_offset: %lld\n", write_file_offset);
+    printk(KERN_ALERT "CloudUSB_con request write_amount: %u\n", write_amount);
+    
+    nwritten = write_amount; // 일단 그대로 넣어줌.
+    req->write_file_offset = write_file_offset;
+    req->write_amount = write_amount;
+    memcpy(req->write_buff, write_buff, write_amount);
+    
+    send_sig_info(SIGUSR2, info, t);
 }
 
 /*-------------------------------------------------------------------------*/

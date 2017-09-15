@@ -21,18 +21,29 @@
 #define RETURN_FILE 1
 #define FILE_WRITE_OVER 2
 
+/* Read & Write flag */
+#define WAIT_HOST 0
+#define EXECUTE_READ 1
+#define EXECUTE_WRITE 2
+
 MODULE_LICENSE("GPL");
 
-struct module_init{
+struct request{
     int pid;
-    unsigned int amount;
-    loff_t file_offset;
+    unsigned int read_amount;
+    unsigned int write_amount;
+    loff_t read_file_offset;
+    loff_t write_file_offset;
+    char *write_buff;
 };
 
 struct return_file{
-    unsigned char *buf;
+    unsigned char *buff;
     int nread;
 };
+
+void perform_read(struct request *req, struct siginfo *info, struct task_struct *t);
+void perform_write(struct request *req, struct siginfo *info, struct task_struct *t);
 
 static int cloud_open(struct inode *inode, struct file *file);
 static long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
