@@ -939,7 +939,7 @@ static int do_write(struct fsg_common *common)
             
             
 			VLDBG(curlun, "file write %u @ %llu -> %d\n", write_amount,
-			      (unsigned long long)file_offset, (int)nwritten);
+			      (unsigned long long)write_file_offset, (int)nwritten);
 			if (signal_pending(current))
 				return -EINTR;		/* Interrupted! */
 
@@ -952,7 +952,7 @@ static int do_write(struct fsg_common *common)
 				     (int)nwritten, write_amount);
 				nwritten = round_down(nwritten, curlun->blksize);
 			}
-			file_offset += nwritten;
+			write_file_offset += nwritten;
 			amount_left_to_write -= nwritten;
 			common->residue -= nwritten;
 
@@ -960,7 +960,7 @@ static int do_write(struct fsg_common *common)
 			if (nwritten < write_amount) {
 				curlun->sense_data = SS_WRITE_ERROR;
 				curlun->sense_data_info =
-					file_offset >> curlun->blkbits;
+					write_file_offset >> curlun->blkbits;
 				curlun->info_valid = 1;
 				break;
 			}
