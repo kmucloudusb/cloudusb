@@ -108,7 +108,7 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     return 0;
 }
 
-void perform_read(request *req, siginfo *info, task_struct *t){
+void perform_read(struct request *req, struct siginfo *info, struct task_struct *t){
     printk(KERN_ALERT "CloudUSB_con request read_file_offset: %lld\n", req->read_file_offset);
     printk(KERN_ALERT "CloudUSB_con request read_amount: %u\n", req->read_amount);
     
@@ -118,7 +118,7 @@ void perform_read(request *req, siginfo *info, task_struct *t){
     send_sig_info(SIGUSR1, info, t);
 }
 
-void perform_write(request *req, siginfo *info, task_struct *t){
+void perform_write(struct request *req, struct siginfo *info, struct task_struct *t){
     printk(KERN_ALERT "CloudUSB_con request write_file_offset: %lld\n", write_file_offset);
     printk(KERN_ALERT "CloudUSB_con request write_amount: %u\n", write_amount);
     printk(KERN_ALERT "CloudUSB_con request write_buff: %x\n", write_buff);
