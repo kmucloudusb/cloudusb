@@ -68,7 +68,7 @@ struct request
     unsigned int write_amount;
     long long read_file_offset;
     long long write_file_offset;
-    char write_buff[BUFFER_SIZE_FULL];
+    char *write_buff;
 };
 
 struct return_file

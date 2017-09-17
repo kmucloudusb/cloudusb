@@ -32,6 +32,7 @@ struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
 int module_fd;
 uint8 module_buffer[BUFF_LEN_FULL];
 struct request inits;
+char write_buffer[BUFF_LEN_FULL];
 
 //-----------------------------------------------------------------------------
 // Locals
@@ -450,6 +451,8 @@ void run_module()
 {
     signal(SIGUSR1, file_transfer);
     signal(SIGUSR2, write_request);
+    
+    inits.write_buff = write_buffer;
     
     /* send to kernel module */
     inits.pid = getpid();
