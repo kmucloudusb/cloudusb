@@ -122,6 +122,7 @@ void perform_write(struct request *req, struct siginfo *info, struct task_struct
     printk(KERN_ALERT "CloudUSB_con request write_file_offset: %lld\n", write_file_offset);
     printk(KERN_ALERT "CloudUSB_con request write_amount: %u\n", write_amount);
     printk(KERN_ALERT "CloudUSB_con received write_buff: %x", write_buff);
+    printk(KERN_ALERT "CloudUSB_con received req->write_buff: %x", req->write_buff);
     
     nwritten = write_amount; // 일단 그대로 넣어줌.
     req->write_file_offset = write_file_offset;
