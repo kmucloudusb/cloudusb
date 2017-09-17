@@ -54,7 +54,7 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     int sector_loc = sector;
     int read_count = 0;
     
-    while (sector_count > read_count && read_count < 32)
+    while (sector_count > read_count && read_count < BUFF_LEN_FULL_SECTOR)
     {
         // (Boot record)
         // 6 -> Do not know why...
