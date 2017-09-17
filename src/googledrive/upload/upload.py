@@ -18,12 +18,12 @@ file_id = ''
 try:
     import argparse
 
-    tools.argparser.add_argument('--down', default='-1', help='file id')
+    tools.argparser.add_argument('--fid', default='-1', help='file id')
 
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
 
-    if flags.down:
-        file_id = flags.down
+    if flags.fid:
+        file_id = flags.fid
 
 
 except ImportError:
@@ -70,12 +70,33 @@ def main():
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
-    file_upload(service)
+    # 1. ROOT_DIRECTORY 이름을 가진 최상위 폴더를 찾음
+    first_folder = service.files().list(
+        q=("mimeType = 'application/vnd.google-apps.folder' and name = '%s'" % ROOT_FOLDER)).execute()
+    first_folder_item = first_folder.get('files', [])
+    root_dir_id = 0
+    if not first_folder_item:
+        print('No %s found.' % ROOT_FOLDER)
+    else:
+        for item in first_folder_item:
+            root_dir_id = item['id']
 
-def file_upload(service):
-    file_metadata = { 'name' : 'photo.jpg' }
-    media = MediaFileUpload('photo.jpg',
-                            mimetype='image/jpeg')
+    file_path = "../download/"
+    file_upload(service, root_dir_id, file_path, file_id)
+
+def file_upload(service, root_dir_id, file_path, file_id):
+
+    prevPath = [root_dir_id]
+    file_metadata = { 
+    'name' : file_id,
+    'parents' : prevPath }
+
+    file_name = file_id;
+    file_full_path = file_path + file_name;
+
+    media = MediaFileUpload(file_full_path)
+    #media = MediaFileUpload('photo.jpg', mimetype='image/jpeg')
+
     file = service.files().create(body=file_metadata,
                                         media_body=media,
                                         fields='id').execute()
