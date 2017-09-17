@@ -28,7 +28,13 @@
 #define INIT 0
 #define RETURN_FILE 1
 #define FILE_WRITE_OVER 2
-#define BUFF_LEN_FULL FAT_SECTOR_SIZE*32
+#define BUFF_LEN_FULL_SECTOR 32
+#define BUFF_LEN_FULL FAT_SECTOR_SIZE*BUFF_LEN_FULL_SECTOR
+
+#define FAT_LOC_BOOT_RECORD 0
+#define FAT_LOC_RESERVED_AREA 1
+#define FAT_LOC_BOOT_RECORD_BACKUP 6
+#define FAT_LOC_RESERVED_AREA_BACKUP 7
 
 #define FAT_ERROR -1
 #define FAT_UNCHANGED 0
@@ -62,7 +68,7 @@ struct request
     unsigned int write_amount;
     long long read_file_offset;
     long long write_file_offset;
-    char write_buff[BUFFER_SIZE_FULL];
+    char *write_buff;
 };
 
 struct return_file

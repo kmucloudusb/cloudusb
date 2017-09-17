@@ -32,6 +32,7 @@ struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
 int module_fd;
 uint8 module_buffer[BUFF_LEN_FULL];
 struct request inits;
+char write_buffer[BUFF_LEN_FULL];
 
 //-----------------------------------------------------------------------------
 // Locals
@@ -54,18 +55,18 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     int sector_loc = sector;
     int read_count = 0;
     
-    while (sector_count > read_count && read_count < 32)
+    while (sector_count > read_count && read_count < BUFF_LEN_FULL_SECTOR)
     {
         // (Boot record)
         // 6 -> Do not know why...
-        if (sector_loc == 0 || sector_loc == 6)
+        if (sector_loc == FAT_LOC_BOOT_RECORD || sector_loc == FAT_LOC_BOOT_RECORD_BACKUP)
         {
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _br, FAT_SECTOR_SIZE);
         }
         
         // (Reserved area)
         // 7 -> Do not know why too...
-        else if (sector_loc == 1 || sector_loc == 7)
+        else if (sector_loc == FAT_LOC_RESERVED_AREA || sector_loc == FAT_LOC_RESERVED_AREA_BACKUP)
         {
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _reserved_area_first, FAT_SECTOR_SIZE);
         }
@@ -450,6 +451,8 @@ void run_module()
 {
     signal(SIGUSR1, file_transfer);
     signal(SIGUSR2, write_request);
+    
+    inits.write_buff = write_buffer;
     
     /* send to kernel module */
     inits.pid = getpid();
