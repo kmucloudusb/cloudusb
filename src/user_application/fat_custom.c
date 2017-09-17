@@ -44,7 +44,7 @@ static unsigned char _reserved_area_first[FAT_SECTOR_SIZE];
 static unsigned char _fat_area[FAT_AREA_FULL]; // Need to dynamic allocation...
 
 static int write_ID;
-static uint32 *write_cluster;
+static uint32 write_cluster;
 
 //-----------------------------------------------------------------------------
 // Filesystem related Functions
@@ -168,7 +168,7 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     {
         unsigned long loc = (sector - fs.fat_begin_lba) % fs.fat_sectors * FAT_SECTOR_SIZE;
         
-        write_ID = search_changed_cluster(_fat_area + loc, buffer, write_cluster);
+        write_ID = search_changed_cluster(_fat_area + loc, buffer, &write_cluster);
         
         memcpy(_fat_area + loc, buffer, sector_count * FAT_SECTOR_SIZE);
     }
