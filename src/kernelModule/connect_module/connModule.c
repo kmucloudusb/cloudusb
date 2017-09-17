@@ -10,9 +10,9 @@ ssize_t	nread = 0;
 
 
 /* write */
-unsigned int write_amount = 0;
+unsigned int write_amount;
 char __user *write_buff = NULL;
-loff_t write_file_offset = 0;
+loff_t write_file_offset;
 ssize_t nwritten = 0;
 
 
