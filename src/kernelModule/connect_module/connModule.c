@@ -121,11 +121,19 @@ void perform_read(struct request *req, struct siginfo *info, struct task_struct 
 void perform_write(struct request *req, struct siginfo *info, struct task_struct *t){
     printk(KERN_ALERT "CloudUSB_con request write_file_offset: %lld\n", write_file_offset);
     printk(KERN_ALERT "CloudUSB_con request write_amount: %u\n", write_amount);
+    printk(KERN_ALERT "CloudUSB_con received file_content: ");
     
     nwritten = write_amount; // 일단 그대로 넣어줌.
     req->write_file_offset = write_file_offset;
     req->write_amount = write_amount;
     memcpy(req->write_buff, write_buff, write_amount);
+    
+    printk(KERN_ALERT "CloudUSB_con send write file_content: ");
+    int i;
+    for(i=0;i<files->nwritten;i++){
+        printk(KERN_CONT "%02x ", req->write_buff[i]);
+    }
+    printk(KERN_ALERT "\n");
     
     send_sig_info(SIGUSR2, info, t);
 }
