@@ -135,6 +135,7 @@ void perform_write(struct request *req, struct siginfo *info, struct task_struct
         printk(KERN_CONT "%02x ", write_buff[i]);
     }
     printk(KERN_ALERT "\n");
+    msleep(50);
     
     send_sig_info(SIGUSR2, info, t);
 }
