@@ -1,6 +1,6 @@
 //
 //  fat_custom.h
-//  revolution
+//  CloudUSB
 //
 //  Created by Hanul on 01/05/2017.
 //  Copyright © 2017 Hanul. All rights reserved.
@@ -28,6 +28,13 @@
 #define INIT 0
 #define RETURN_FILE 1
 #define BUFF_LEN_FULL FAT_SECTOR_SIZE*32
+
+#define FAT_ERROR -1
+#define FAT_UNCHANGED 0
+#define FAT_CREATION 1
+#define FAT_EXPANSION 2
+#define FAT_DELETION 3
+#define FAT_REDUCTION 4
 
 //-----------------------------------------------------------------------------
 // Structures
@@ -80,8 +87,11 @@ int create_direntry(uint32 startcluster);
 int create_dataentry(uint32 startcluster, uint32 fsize, char *fid);
 void write_entries();
 
+int search_changed_cluster(uint8 *before, uint8 *after, uint32 *loc);
+
 int download_file(char *fid);
 int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count);
+int write_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count);
 
 void read_requested(uint32 offset, unsigned char *buffer, uint32 offset_count);
 
