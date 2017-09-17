@@ -58,14 +58,14 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     {
         // (Boot record)
         // 6 -> Do not know why...
-        if (sector_loc == 0 || sector_loc == 6)
+        if (sector_loc == FAT_LOC_BOOT_RECORD || sector_loc == FAT_LOC_BOOT_RECORD_BACKUP)
         {
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _br, FAT_SECTOR_SIZE);
         }
         
         // (Reserved area)
         // 7 -> Do not know why too...
-        else if (sector_loc == 1 || sector_loc == 7)
+        else if (sector_loc == FAT_LOC_RESERVED_AREA || sector_loc == FAT_LOC_RESERVED_AREA_BACKUP)
         {
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _reserved_area_first, FAT_SECTOR_SIZE);
         }
