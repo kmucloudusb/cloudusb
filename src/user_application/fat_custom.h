@@ -27,6 +27,7 @@
 #define BUFFER_SIZE_FULL 16384
 #define INIT 0
 #define RETURN_FILE 1
+#define FILE_WRITE_OVER 2
 #define BUFF_LEN_FULL FAT_SECTOR_SIZE*32
 
 #define FAT_ERROR -1
@@ -54,11 +55,14 @@ struct dataentry
     int                     fd;
 };
 
-struct module_init
+struct request
 {
     int pid;
-    unsigned int amount;
-    long long file_offset;
+    unsigned int read_amount;
+    unsigned int write_amount;
+    long long read_file_offset;
+    long long write_file_offset;
+    char write_buff[BUFFER_SIZE_FULL];
 };
 
 struct return_file
@@ -97,5 +101,6 @@ void read_requested(uint32 offset, unsigned char *buffer, uint32 offset_count);
 
 void run_module();
 void file_transfer(int signo);
+void write_request(int signo);
 
 #endif /* fat_custom_h */

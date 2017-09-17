@@ -31,7 +31,7 @@ struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
 //-----------------------------------------------------------------------------
 int module_fd;
 uint8 module_buffer[BUFF_LEN_FULL];
-struct module_init inits;
+struct request inits;
 
 //-----------------------------------------------------------------------------
 // Locals
@@ -449,6 +449,7 @@ int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long
 void run_module()
 {
     signal(SIGUSR1, file_transfer);
+    signal(SIGUSR2, write_request);
     
     /* send to kernel module */
     inits.pid = getpid();
@@ -475,17 +476,25 @@ void file_transfer(int signo)
 {
     struct return_file files;
     
-    uint32 offset_count = inits.amount; // Block request length
-    uint32 offset = inits.file_offset; // Block request start point
+    uint32 offset_count = inits.read_amount; // Block request length
+    uint32 offset = inits.read_file_offset; // Block request start point
     
     memset(module_buffer, 0x00, BUFF_LEN_FULL);
     read_requested(offset, module_buffer, offset_count);
     
     files.buf = module_buffer; // substitute buffer address which have file info
-    files.nread = inits.amount; // substitute buffer length which have file info
+    files.nread = inits.read_amount; // substitute buffer length which have file info
     
     if(ioctl(module_fd, RETURN_FILE, &files) < 0)
         printf("Error in IOCTL2 errno: %d\n", errno);
+}
+
+void write_request(int signo)
+{
+    write_virtual(inits.write_file_offset / FAT_SECTOR_SIZE, inits.write_buff, inits.write_amount / FAT_SECTOR_SIZE);
+    
+    if(ioctl(module_fd, FILE_WRITE_OVER, NULL) < 0)
+        printf("Error in IOCTL3 errno: %d\n", errno);
 }
 
 //-----------------------------------------------------------------------------
