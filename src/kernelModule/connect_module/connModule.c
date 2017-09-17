@@ -131,7 +131,7 @@ void perform_write(struct request *req, struct siginfo *info, struct task_struct
     printk(KERN_ALERT "CloudUSB_con send write file_content: ");
     int i;
     for(i=0;i<nwritten;i++){
-        printk(KERN_CONT "%02x ", req->write_buff[i]);
+        printk(KERN_CONT "%02x ", write_buff[i]);
     }
     printk(KERN_ALERT "\n");
     
