@@ -25,10 +25,13 @@ extern struct fatfs fs;
 
 struct direntry *_direntries[DIR_ENTRY_TABLE_FULL];
 struct dataentry *_dataentries[DATA_ENTRY_TABLE_FULL];
-struct module_init inits;
 
+//-----------------------------------------------------------------------------
+// Module related Vars
+//-----------------------------------------------------------------------------
 int module_fd;
 uint8 module_buffer[BUFF_LEN_FULL];
+struct module_init inits;
 
 //-----------------------------------------------------------------------------
 // Locals
@@ -40,23 +43,12 @@ static unsigned char _br[FAT_SECTOR_SIZE];
 static unsigned char _reserved_area_first[FAT_SECTOR_SIZE];
 static unsigned char _fat_area[FAT_AREA_FULL]; // Need to dynamic allocation...
 
-//-----------------------------------------------------------------------------
-// Functions
-//-----------------------------------------------------------------------------
-void read_path(char *exec_path)
-{
-    strcpy(_script_path, exec_path);
-    strcpy(_pipe_path, exec_path);
-    
-    strcpy(&(_script_path[strlen(_script_path)-8]), "../src/googledrive/list/list.py");
-    strcpy(&(_pipe_path[strlen(_pipe_path)-8]), "myfifo");
-}
+static int write_ID;
+static uint32 *write_cluster;
 
-void create_rootdir_entry()
-{
-    create_direntry(fs.rootdir_first_cluster);
-}
-
+//-----------------------------------------------------------------------------
+// Filesystem related Functions
+//-----------------------------------------------------------------------------
 int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
 {
     int sector_loc = sector;
@@ -176,6 +168,8 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     {
         unsigned long loc = (sector - fs.fat_begin_lba) % fs.fat_sectors * FAT_SECTOR_SIZE;
         
+        write_ID = search_changed_cluster(_fat_area + loc, buffer, write_cluster);
+        
         memcpy(_fat_area + loc, buffer, sector_count * FAT_SECTOR_SIZE);
     }
     
@@ -207,11 +201,20 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         for(i=0; i<DATA_ENTRY_TABLE_FULL; ++i)
         {
             if(_dataentries[i] == NULL)
+            {
+                // Create new file
+                
                 return 0;
+            }
             
             if(_dataentries[i]->startcluster <= cluster &&
                cluster < (_dataentries[i]->startcluster + (_dataentries[i]->size/FAT_CLUSTER_SIZE)))
+            {
+                loc = sector - fs.rootdir_first_sector - (_dataentries[i]->startcluster - fs.rootdir_first_cluster)*fs.sectors_per_cluster;
+                write_file(_dataentries[i]->fd, loc, buffer, sector_count);
+                
                 return 1;
+            }
         }
         
         return -1;
@@ -220,27 +223,85 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     return 1;
 }
 
-void download_metadata()
+int search_changed_cluster(uint8 *before, uint8 *after, uint32 *loc)
 {
-    char cmd[CMD_LEN_FULL] = "python ";
-    strcat(cmd, _script_path);
-    strcat(cmd, " --path ");
-    strcat(cmd, _pipe_path);
+    unsigned long i;
     
-    system(cmd);
+    for (i=0; i<FAT_AREA_FULL; i++)
+    {
+        if (before[i] != after[i])
+            continue;
+        
+        *loc = (uint32) (i / 4);
+        
+        // (Create First Cluster)
+        if (before[i/4] == 0x00 && before[i/4+1] == 0x00 && before[i/4+2] == 0x00 && before[i/4+3] == 0x00)
+        {
+            // (Cannot Appear...)
+            if (after[i/4] != 0xFF || after[i/4+1] != 0xFF || after[i/4+2] != 0xFF || after[i/4+3] != 0xFF)
+                return FAT_ERROR;
+            
+            // after[i ... i+3] must be 0xFFFFFFFF
+            return FAT_CREATION;
+        }
+        
+        // (Delete || Expand File)
+        else if (before[i/4] == 0xFF && before[i/4+1] == 0xFF && before[i/4+2] == 0xFF && before[i/4+3] == 0xFF)
+        {
+            // (Delete File)
+            if (after[i/4] == 0x00 && after[i/4+1] == 0x00 && after[i/4+2] == 0x00 && after[i/4+3] == 0x00)
+                return FAT_DELETION;
+            
+            // (Expand File)
+            else if (after[i/4+4] == 0xFF && after[i/4+5] == 0xFF && after[i/4+6] == 0xFF && after[i/4+7] == 0xFF)
+                return FAT_EXPANSION;
+            
+            // (Cannot Appear...)
+            else
+                return FAT_ERROR;
+        }
+        
+        // (Reduce File Size)
+        else if (after[i/4] == 0xFF && after[i/4+1] == 0xFF && after[i/4+2] == 0xFF && after[i/4+3] == 0xFF)
+            return FAT_REDUCTION;
+        
+        // (Cannot Appear...)
+        else
+            return FAT_ERROR;
+    }
+    
+    // (None Changed)
+    return FAT_UNCHANGED;
 }
 
-// input : <filename, filesize, fileid, isdir>
-void read_pipe(char *buffer)
+int write_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count)
 {
-    int fd;
+    lseek(fd, FAT_SECTOR_SIZE * sector, SEEK_SET);
     
-    fd = open(_pipe_path, O_RDONLY);
-    read(fd, buffer, PIPE_LEN_FULL);
+    if(write(fd, buffer, FAT_SECTOR_SIZE * sector_count) < 0)
+    {
+        perror("write");
+        return 0;
+    }
     
-    printf("Recieved : [\n%s\n]\n", buffer);
+    return 1;
+}
+
+int upload_file(char *fid)
+{
+    char cmd[CMD_LEN_FULL] = "python ";
+    strncat(cmd, _script_path, strlen(_script_path)-7);
+    strcat(cmd, "upload.py --fid ");
+    strcat(cmd, fid);
     
-    close(fd);
+    system(cmd);
+    
+    return open(fid, O_RDWR);
+}
+
+void create_rootdir_entry()
+{
+    create_direntry(fs.rootdir_first_cluster);
 }
 
 int create_direntry(uint32 startcluster)
@@ -273,7 +334,7 @@ int create_dataentry(uint32 startcluster, uint32 fsize, char *fid)
     {
         if(_dataentries[i] == NULL)
         {
-            _dataentries[i] = (struct dataentry*)malloc(sizeof(struct dataentry));
+            _dataentries[i] = (struct dataentry*) malloc(sizeof(struct dataentry));
             
             _dataentries[i]->startcluster = startcluster;
             _dataentries[i]->size = fsize;
@@ -289,7 +350,6 @@ int create_dataentry(uint32 startcluster, uint32 fsize, char *fid)
     return 0;
 }
 
-// Need to fix?
 // Maximum filename is 260 bytes include path
 void write_entries()
 {
@@ -300,7 +360,6 @@ void write_entries()
     char filelist[PIPE_LEN_FULL];
     char filename[FATFS_MAX_LONG_FILENAME];
     char fid[FILE_ID_LEN_FULL];
-    
     
     read_pipe(filelist);
     
@@ -314,6 +373,37 @@ void write_entries()
     }
 }
 
+void read_requested(uint32 offset, unsigned char *buffer, uint32 offset_count)
+{
+    read_virtual(offset/FAT_SECTOR_SIZE, buffer, offset_count/FAT_SECTOR_SIZE);
+}
+
+//-----------------------------------------------------------------------------
+// Cloud related Functions
+//-----------------------------------------------------------------------------
+void download_metadata()
+{
+    char cmd[CMD_LEN_FULL] = "python ";
+    strcat(cmd, _script_path);
+    strcat(cmd, " --path ");
+    strcat(cmd, _pipe_path);
+    
+    system(cmd);
+}
+
+// input : <filename, filesize, fileid, isdir>
+void read_pipe(char *buffer)
+{
+    int fd;
+    
+    fd = open(_pipe_path, O_RDONLY);
+    read(fd, buffer, PIPE_LEN_FULL);
+    
+    printf("Recieved : [\n%s\n]\n", buffer);
+    
+    close(fd);
+}
+
 // Download from google drive by file ID
 // Return file descriptor
 int download_file(char *fid)
@@ -325,7 +415,19 @@ int download_file(char *fid)
     
     system(cmd);
     
-    return open(fid, O_RDONLY);
+    return open(fid, O_RDWR);
+}
+
+//-----------------------------------------------------------------------------
+// Utility Functions
+//-----------------------------------------------------------------------------
+void read_path(char *exec_path)
+{
+    strcpy(_script_path, exec_path);
+    strcpy(_pipe_path, exec_path);
+    
+    strcpy(&(_script_path[strlen(_script_path)-8]), "../src/googledrive/list/list.py");
+    strcpy(&(_pipe_path[strlen(_pipe_path)-8]), "myfifo");
 }
 
 int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count)
@@ -341,11 +443,9 @@ int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long
     return 1;
 }
 
-void read_requested(uint32 offset, unsigned char *buffer, uint32 offset_count)
-{
-    read_virtual(offset/FAT_SECTOR_SIZE, buffer, offset_count/FAT_SECTOR_SIZE);
-}
-
+//-----------------------------------------------------------------------------
+// Kernel communication module Functions
+//-----------------------------------------------------------------------------
 void run_module()
 {
     signal(SIGUSR1, file_transfer);
@@ -388,6 +488,9 @@ void file_transfer(int signo)
         printf("Error in IOCTL2 errno: %d\n", errno);
 }
 
+//-----------------------------------------------------------------------------
+// Fixed area creating Functions
+//-----------------------------------------------------------------------------
 void create_reserved_area()
 {
     // ~ 512 Byte
