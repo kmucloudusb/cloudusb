@@ -729,7 +729,7 @@ static int do_read(struct fsg_common *common)
         printk(KERN_ALERT "CloudUSB_fmass read_amount:%u\n", read_amount);
         
         /* send block request and wait until return file content. no race condition */
-        while(cloud_flag){schedule_timeout_uninterruptible(0.001*HZ);}
+        while(cloud_flag==EXECUTE_READ || cloud_flag ==EXECUTE_WRITE ){schedule_timeout_uninterruptible(0.001*HZ);}
         
         /* perform the read */
         /* remove this function and send block request */

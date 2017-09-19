@@ -69,7 +69,6 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 return -ENODEV;
             }
             printk(KERN_ALERT "CloudUSB_con init success\n");
-            cloud_flag = 0;
             break;
         case RETURN_FILE:
             printk(KERN_ALERT "CloudUSB_con ioctl get RETURN_FILE\n");
@@ -88,11 +87,12 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
             
             memcpy(read_buff, files->buff, files->nread);
             nread = files->nread;
-            cloud_flag = 0;
             break;
         case FILE_WRITE_OVER:
             printk(KERN_ALERT "CloudUSB_con ioctl get FILE_WRITE_OVER\n");
     }
+    
+    cloud_flag = WAIT_HOST;
     printk(KERN_ALERT "CloudUSB wait next block request.\n");
     
     /* wait because of context problem, no race condition */
