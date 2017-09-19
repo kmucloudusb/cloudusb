@@ -97,6 +97,7 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     
     /* wait because of context problem, no race condition */
     while(!cloud_flag){schedule_timeout_uninterruptible(0.001*HZ);}
+    msleep(100);
     
     /* set block request struct and send signal */
     printk(KERN_ALERT "CloudUSB_con receive block request(after wait)\n");
@@ -135,7 +136,6 @@ void perform_write(struct request *req, struct siginfo *info, struct task_struct
         printk(KERN_CONT "%02x ", write_buff[i]);
     }
     printk(KERN_ALERT "\n");
-    msleep(50);
     
     send_sig_info(SIGUSR2, info, t);
 }
