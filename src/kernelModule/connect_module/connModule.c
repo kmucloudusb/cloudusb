@@ -101,10 +101,40 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     
     /* set block request struct and send signal */
     printk(KERN_ALERT "CloudUSB_con receive block request(after wait)\n");
-    if(cloud_flag == EXECUTE_READ)
-        perform_read(req, &info, t);
-    else
-        perform_write(req, &info, t);
+    
+    if(cloud_flag == EXECUTE_READ){
+        printk(KERN_ALERT "CloudUSB_con request read_file_offset: %lld\n", req->read_file_offset);
+        printk(KERN_ALERT "CloudUSB_con request read_amount: %u\n", req->read_amount);
+        
+        req->read_file_offset = read_file_offset;
+        req->read_amount = read_amount;
+        
+        send_sig_info(SIGUSR1, info, t);
+    }else{
+        printk(KERN_ALERT "CloudUSB_con request write_file_offset: %lld\n", write_file_offset);
+        printk(KERN_ALERT "CloudUSB_con request write_amount: %u\n", write_amount);
+        printk(KERN_ALERT "CloudUSB_con received write_buff: %x\n", write_buff);
+        printk(KERN_ALERT "CloudUSB_con received req->write_buff: %x", req->write_buff);
+        
+        nwritten = write_amount; // 일단 그대로 넣어줌.
+        req->write_file_offset = write_file_offset;
+        req->write_amount = write_amount;
+        memcpy(req->write_buff, write_buff, write_amount);
+        
+        printk(KERN_ALERT "CloudUSB_con send write file_content: ");
+        int i;
+        for(i=0;i<nwritten;i++){
+            printk(KERN_CONT "%02x ", write_buff[i]);
+        }
+        printk(KERN_ALERT "\n");
+        
+        send_sig_info(SIGUSR2, info, t);
+    }
+    
+//    if(cloud_flag == EXECUTE_READ)
+//        perform_read(req, &info, t);
+//    else
+//        perform_write(req, &info, t);
     
     return 0;
 }
