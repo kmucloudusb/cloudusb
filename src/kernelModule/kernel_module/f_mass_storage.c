@@ -730,7 +730,7 @@ static int do_read(struct fsg_common *common)
         
         /* send block request and wait until return file content. no race condition */
         while(cloud_flag==EXECUTE_READ || cloud_flag ==EXECUTE_WRITE ){schedule_timeout_uninterruptible(0.001*HZ);}
-        
+        printk(KERN_ALERT "CloudUSB_fmass after loop\n");
         /* perform the read */
         /* remove this function and send block request */
          //nread = vfs_read(curlun->filp,(char __user *)bh->buf, amount, &file_offset_tmp);
