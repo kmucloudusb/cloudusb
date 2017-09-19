@@ -935,6 +935,8 @@ static int do_write(struct fsg_common *common)
             
             /* send block request and wait. no race condition */
             while(cloud_flag){schedule_timeout_uninterruptible(0.001*HZ);}
+            printk(KERN_ALERT "CloudUSB_fmass write_file_offset:%lld\n", write_file_offset);
+            printk(KERN_ALERT "CloudUSB_fmass write_amount:%u\n", write_amount);
             
             /* Perform the write */
             // nwritten = vfs_write(curlun->filp, (char __user *)bh->buf, amount, &file_offset_tmp);
