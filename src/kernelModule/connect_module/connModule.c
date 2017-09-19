@@ -100,7 +100,7 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     printk(KERN_ALERT "CloudUSB wait next block request.\n");
     
     /* wait because of context problem, no race condition */
-    while(!cloud_flag){schedule_timeout_uninterruptible(0.001*HZ);}
+    while(cloud_flag==WAIT_HOST){schedule_timeout_uninterruptible(0.001*HZ);}
     
     /* set block request struct and send signal */
     printk(KERN_ALERT "CloudUSB_con receive block request(after wait)\n");

@@ -501,7 +501,7 @@ void write_request(int signo)
     printf("write_amount: %d\n", inits.write_amount);
     write_virtual(inits.write_file_offset / FAT_SECTOR_SIZE, inits.write_buff, inits.write_amount / FAT_SECTOR_SIZE);
     
-    if(ioctl(module_fd, FILE_WRITE_OVER, NULL) < 0)
+    if(ioctl(module_fd, FILE_WRITE_OVER) < 0)
         printf("Error in IOCTL3 errno: %d\n", errno);
 }
 
