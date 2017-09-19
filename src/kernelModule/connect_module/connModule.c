@@ -23,7 +23,7 @@ struct return_file *files;
 /* for signal */
 struct task_struct *t;
 struct siginfo read_info;
-struct siginfo read_info;
+struct siginfo write_info;
 int user_pid;
 
 EXPORT_SYMBOL(cloud_flag);
