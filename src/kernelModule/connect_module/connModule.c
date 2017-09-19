@@ -103,11 +103,10 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     printk(KERN_ALERT "CloudUSB_con receive block request(after wait)\n");
     
     if(cloud_flag == EXECUTE_READ){
-        printk(KERN_ALERT "CloudUSB_con request read_file_offset: %lld\n", req->read_file_offset);
-        printk(KERN_ALERT "CloudUSB_con request read_amount: %u\n", req->read_amount);
-        
         req->read_file_offset = read_file_offset;
         req->read_amount = read_amount;
+        printk(KERN_ALERT "CloudUSB_con request read_file_offset: %lld\n", req->read_file_offset);
+        printk(KERN_ALERT "CloudUSB_con request read_amount: %u\n", req->read_amount);
         
         send_sig_info(SIGUSR1, &info, t);
     }else{
@@ -120,6 +119,9 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         req->write_file_offset = write_file_offset;
         req->write_amount = write_amount;
         memcpy(req->write_buff, write_buff, write_amount);
+        
+        printk(KERN_ALERT "CloudUSB_con req->write_file_offset: %lld\n", req->write_file_offset);
+        printk(KERN_ALERT "CloudUSB_con req->write_amount: %u\n", req->write_amount);
         
         printk(KERN_ALERT "CloudUSB_con send write file_content: ");
         int i;
