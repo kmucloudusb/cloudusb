@@ -494,6 +494,8 @@ void file_transfer(int signo)
 
 void write_request(int signo)
 {
+    printf("write_file_offset: %d\n", inits.write_file_offset);
+    printf("write_amount: %d\n", inits.write_amount);
     write_virtual(inits.write_file_offset / FAT_SECTOR_SIZE, inits.write_buff, inits.write_amount / FAT_SECTOR_SIZE);
     
     if(ioctl(module_fd, FILE_WRITE_OVER, NULL) < 0)
