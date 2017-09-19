@@ -479,6 +479,9 @@ void file_transfer(int signo)
 {
     struct return_file files;
     
+    printf("read_file_offset: %d\n", inits.read_file_offset);
+    printf("read_amount: %d\n", inits.read_amount);
+    
     uint32 offset_count = inits.read_amount; // Block request length
     uint32 offset = inits.read_file_offset; // Block request start point
     
