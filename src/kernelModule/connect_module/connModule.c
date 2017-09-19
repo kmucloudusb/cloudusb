@@ -4,7 +4,7 @@ int cloud_flag = WAIT_HOST;
 
 /* read */
 unsigned int read_amount = 0;
-char __user *read_buff = NULL;
+char __user *read_buff;
 loff_t read_file_offset = 0;
 ssize_t	nread = 0;
 
@@ -22,7 +22,8 @@ struct return_file *files;
 
 /* for signal */
 struct task_struct *t;
-struct siginfo info;
+struct siginfo read_info;
+struct siginfo read_info;
 int user_pid;
 
 EXPORT_SYMBOL(cloud_flag);
@@ -58,9 +59,12 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
             printk(KERN_ALERT "CloudUSB_con ioctl get INIT\n");
             req = (struct request *)(arg);
             user_pid = req->pid;
-            memset(&info, 0 ,sizeof(struct siginfo));
-            info.si_signo = SIGUSR1;
-            info.si_code = SI_QUEUE;
+            memset(&read_info, 0 ,sizeof(struct siginfo));
+            read_info.si_signo = SIGUSR1;
+            read_info.si_code = SI_QUEUE;
+            memset(&write_info, 0 ,sizeof(struct siginfo));
+            write_info.si_signo = SIGUSR2;
+            write_info.si_code = SI_QUEUE;
             rcu_read_lock();
             t = pid_task(find_vpid(user_pid), PIDTYPE_PID);
             rcu_read_unlock();
@@ -97,7 +101,6 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     
     /* wait because of context problem, no race condition */
     while(!cloud_flag){schedule_timeout_uninterruptible(0.001*HZ);}
-    msleep(100);
     
     /* set block request struct and send signal */
     printk(KERN_ALERT "CloudUSB_con receive block request(after wait)\n");
@@ -108,7 +111,7 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         printk(KERN_ALERT "CloudUSB_con request read_file_offset: %lld\n", req->read_file_offset);
         printk(KERN_ALERT "CloudUSB_con request read_amount: %u\n", req->read_amount);
         
-        send_sig_info(SIGUSR1, &info, t);
+        send_sig_info(SIGUSR1, &read_info, t);
     }else{
         printk(KERN_ALERT "CloudUSB_con request write_file_offset: %lld\n", write_file_offset);
         printk(KERN_ALERT "CloudUSB_con request write_amount: %u\n", write_amount);
@@ -130,13 +133,13 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         }
         printk(KERN_ALERT "\n");
         
-        send_sig_info(SIGUSR2, &info, t);
+        send_sig_info(SIGUSR2, &write_info, t);
     }
     
 //    if(cloud_flag == EXECUTE_READ)
-//        perform_read(req, &info, t);
+//        perform_read(req, &read_info, t);
 //    else
-//        perform_write(req, &info, t);
+//        perform_write(req, &write_info, t);
     
     return 0;
 }
