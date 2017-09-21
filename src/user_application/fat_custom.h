@@ -97,7 +97,9 @@ int create_direntry(uint32 startcluster);
 int create_dataentry(uint32 startcluster, uint32 fsize, char *fid);
 void write_entries();
 
-int search_changed_cluster(uint8 *before, uint8 *after, uint32 *loc);
+int is_euqal_4byte(uint8 *real, uint8 expect);
+int is_diff_4byte(uint8 *real, uint8 expect);
+int search_changed_cluster(uint8 *before, uint8 *after);
 
 int download_file(char *fid);
 int read_file(int fd, unsigned long sector, unsigned char *buffer, unsigned long sector_count);
