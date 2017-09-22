@@ -657,8 +657,8 @@ struct write_export{
 };
 
 extern volatile int cloud_flag;
-extern struct read_info *reads;
-extern struct write_info *writes;
+extern struct read_export *reads;
+extern struct write_export *writes;
 
 static int do_read(struct fsg_common *common)
 {
