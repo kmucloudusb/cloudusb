@@ -44,8 +44,7 @@ static unsigned char _br[FAT_SECTOR_SIZE];
 static unsigned char _reserved_area_first[FAT_SECTOR_SIZE];
 static unsigned char _fat_area[FAT_AREA_FULL]; // Need to dynamic allocation...
 
-static int write_ID;
-static uint32 write_cluster;
+static uint32 root_cluster[FAT_AREA_FULL / FAT_CLUSTER_SIZE];
 
 //-----------------------------------------------------------------------------
 // Filesystem related Functions
@@ -58,14 +57,12 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     while (sector_count > read_count && read_count < BUFF_LEN_FULL_SECTOR)
     {
         // (Boot record)
-        // 6 -> Do not know why...
         if (sector_loc == FAT_LOC_BOOT_RECORD || sector_loc == FAT_LOC_BOOT_RECORD_BACKUP)
         {
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _br, FAT_SECTOR_SIZE);
         }
         
         // (Reserved area)
-        // 7 -> Do not know why too...
         else if (sector_loc == FAT_LOC_RESERVED_AREA || sector_loc == FAT_LOC_RESERVED_AREA_BACKUP)
         {
             memcpy(buffer+read_count*FAT_SECTOR_SIZE, _reserved_area_first, FAT_SECTOR_SIZE);
@@ -95,7 +92,6 @@ int read_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 if(_direntries[i]->cluster == cluster)
                 {
                     // Location in cluster
-                    // Do not touch it it's my masterpiece
                     unsigned long loc = ((sector_loc - fs.rootdir_first_sector) % fs.sectors_per_cluster) * FAT_SECTOR_SIZE;
                     
                     memcpy(buffer, _direntries[i]->entry + loc, (sector_count-read_count) * FAT_SECTOR_SIZE);
@@ -158,7 +154,6 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         return -1;
     
     // (Reserved area)
-    // 7 -> Do not know why too...
     if(sector == 1 || sector == 7)
     {
         memcpy(_reserved_area_first, buffer, FAT_SECTOR_SIZE);
@@ -169,7 +164,7 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     {
         unsigned long loc = (sector - fs.fat_begin_lba) % fs.fat_sectors * FAT_SECTOR_SIZE;
         
-        write_ID = search_changed_cluster(_fat_area + loc, buffer, &write_cluster);
+        search_changed_cluster(_fat_area + loc, buffer);
         
         memcpy(_fat_area + loc, buffer, sector_count * FAT_SECTOR_SIZE);
     }
@@ -198,7 +193,6 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
         }
         
         // Search data table
-        // Incompletion...
         for(i=0; i<DATA_ENTRY_TABLE_FULL; ++i)
         {
             if(_dataentries[i] == NULL)
@@ -208,8 +202,7 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 return 0;
             }
             
-            if(_dataentries[i]->startcluster <= cluster &&
-               cluster < (_dataentries[i]->startcluster + (_dataentries[i]->size/FAT_CLUSTER_SIZE)))
+            if(_dataentries[i]->startcluster == root_cluster[cluster])
             {
                 loc = sector - fs.rootdir_first_sector - (_dataentries[i]->startcluster - fs.rootdir_first_cluster)*fs.sectors_per_cluster;
                 write_file(_dataentries[i]->fd, loc, buffer, sector_count);
@@ -224,7 +217,17 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
     return 1;
 }
 
-int search_changed_cluster(uint8 *before, uint8 *after, uint32 *loc)
+int is_euqal_4byte(uint8 *real, uint8 expect)
+{
+    return (real[0] == expect && real[1] == expect && real[2] == expect && real[3] == expect);
+}
+
+int is_diff_4byte(uint8 *real, uint8 expect)
+{
+    return (real[0] != expect || real[1] != expect || real[2] != expect || real[3] != expect);
+}
+
+int search_changed_cluster(uint8 *before, uint8 *after)
 {
     unsigned long i;
     
@@ -233,29 +236,39 @@ int search_changed_cluster(uint8 *before, uint8 *after, uint32 *loc)
         if (before[i] != after[i])
             continue;
         
-        *loc = (uint32) (i / 4);
+        uint32 loc = (uint32) (i / 4);
         
         // (Create First Cluster)
-        if (before[i/4] == 0x00 && before[i/4+1] == 0x00 && before[i/4+2] == 0x00 && before[i/4+3] == 0x00)
+        if (is_euqal_4byte(before+loc, 0x00))
         {
             // (Cannot Appear...)
-            if (after[i/4] != 0xFF || after[i/4+1] != 0xFF || after[i/4+2] != 0xFF || after[i/4+3] != 0xFF)
+            if (is_diff_4byte(after + loc, 0xFF))
                 return FAT_ERROR;
             
             // after[i ... i+3] must be 0xFFFFFFFF
+            root_cluster[loc] = loc;
+            
             return FAT_CREATION;
         }
         
         // (Delete || Expand File)
-        else if (before[i/4] == 0xFF && before[i/4+1] == 0xFF && before[i/4+2] == 0xFF && before[i/4+3] == 0xFF)
+        else if (is_euqal_4byte(before+loc, 0xFF))
         {
             // (Delete File)
-            if (after[i/4] == 0x00 && after[i/4+1] == 0x00 && after[i/4+2] == 0x00 && after[i/4+3] == 0x00)
+            if (is_euqal_4byte(after+loc, 0x00))
+            {
+                root_cluster[loc] = 0;
+                
                 return FAT_DELETION;
+            }
             
             // (Expand File)
-            else if (after[i/4+4] == 0xFF && after[i/4+5] == 0xFF && after[i/4+6] == 0xFF && after[i/4+7] == 0xFF)
+            else if (is_euqal_4byte(after+loc+4, 0xFF)) // Next cluster
+            {
+                root_cluster[loc+1] = root_cluster[loc];
+                
                 return FAT_EXPANSION;
+            }
             
             // (Cannot Appear...)
             else
@@ -263,8 +276,12 @@ int search_changed_cluster(uint8 *before, uint8 *after, uint32 *loc)
         }
         
         // (Reduce File Size)
-        else if (after[i/4] == 0xFF && after[i/4+1] == 0xFF && after[i/4+2] == 0xFF && after[i/4+3] == 0xFF)
+        else if (is_euqal_4byte(after+loc, 0xFF))
+        {
+            root_cluster[loc] = 0;
+            
             return FAT_REDUCTION;
+        }
         
         // (Cannot Appear...)
         else
@@ -479,7 +496,7 @@ void file_transfer(int signo)
 {
     struct return_file files;
     
-    printf("read_file_offset: %d\n", inits.read_file_offset);
+    printf("read_file_offset: %lld\n", inits.read_file_offset);
     printf("read_amount: %d\n", inits.read_amount);
     
     uint32 offset_count = inits.read_amount; // Block request length
@@ -497,10 +514,10 @@ void file_transfer(int signo)
 
 void write_request(int signo)
 {
-    printf("write_file_offset: %d\n", inits.write_file_offset);
-    printf("write_amount: %d\n", inits.write_amount);
     write_virtual(inits.write_file_offset / FAT_SECTOR_SIZE, inits.write_buff, inits.write_amount / FAT_SECTOR_SIZE);
+    
     int nwritten;
+    
     if(ioctl(module_fd, FILE_WRITE_OVER, &nwritten) < 0)
         printf("Error in IOCTL3 errno: %d\n", errno);
 }
