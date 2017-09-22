@@ -15,7 +15,7 @@
 #include <linux/sched.h>
 #include <linux/rcupdate.h>
 #include <linux/delay.h>
-#include <linx/slab.h>
+#include <linux/slab.h>
 
 /* ioctl command */
 #define INIT 0
