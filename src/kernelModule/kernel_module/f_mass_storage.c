@@ -642,13 +642,23 @@ static int sleep_thread(struct fsg_common *common, bool can_freeze)
 #define EXECUTE_READ 1
 #define EXECUTE_WRITE 2
 
-extern int cloud_flag;
+struct read_export{
+    unsigned int read_amount = 0;
+    char __user *read_buff;
+    loff_t read_file_offset = 0;
+    ssize_t	nread = 0;
+};
 
-extern unsigned int read_amount;
-extern char __user *read_buff;
-extern loff_t read_file_offset;
-extern ssize_t nread;
+struct write_export{
+    unsigned int write_amount;
+    char __user *write_buff = NULL;
+    loff_t write_file_offset;
+    ssize_t nwritten = 0;
+};
 
+extern volatile int cloud_flag;
+extern struct read_info reads;
+extern struct write_info writes;
 
 static int do_read(struct fsg_common *common)
 {
@@ -681,7 +691,7 @@ static int do_read(struct fsg_common *common)
 		curlun->sense_data = SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
 		return -EINVAL;
 	}
-	read_file_offset = ((loff_t) lba) << curlun->blkbits;
+	reads->read_file_offset = ((loff_t) lba) << curlun->blkbits;
 
 	/* Carry out the file reads */
 	amount_left = common->data_size_from_cmnd;
@@ -695,9 +705,9 @@ static int do_read(struct fsg_common *common)
 		 * But don't read more than the buffer size.
 		 * And don't try to read past the end of the file.
 		 */
-		read_amount = min(amount_left, FSG_BUFLEN);
-		read_amount = min((loff_t)read_amount,
-			     curlun->file_length - read_file_offset);
+		reads->read_amount = min(amount_left, FSG_BUFLEN);
+		reads->read_amount = min((loff_t)reads->read_amount,
+			     curlun->file_length - reads->read_file_offset);
 
 		/* Wait for the next buffer to become available */
 		bh = common->next_buffhd_to_fill;
@@ -711,63 +721,63 @@ static int do_read(struct fsg_common *common)
 		 * If we were asked to read past the end of file,
 		 * end with an empty buffer.
 		 */
-		if (read_amount == 0) {
+		if (reads->read_amount == 0) {
 			curlun->sense_data =
 					SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
 			curlun->sense_data_info =
-					read_file_offset >> curlun->blkbits;
+					reads->read_file_offset >> curlun->blkbits;
 			curlun->info_valid = 1;
 			bh->inreq->length = 0;
 			bh->state = BUF_STATE_FULL;
 			break;
 		}
         
-        read_buff = bh->buf;
+        reads->read_buff = bh->buf;
         cloud_flag = EXECUTE_READ;
         printk(KERN_ALERT "CloudUSB_fmass receive new block request\n");
-        printk(KERN_ALERT "CloudUSB_fmass read_file_offset:%lld\n", read_file_offset);
-        printk(KERN_ALERT "CloudUSB_fmass read_amount:%u\n", read_amount);
+        printk(KERN_ALERT "CloudUSB_fmass read_file_offset:%lld\n", reads->read_file_offset);
+        printk(KERN_ALERT "CloudUSB_fmass read_amount:%u\n", reads->read_amount);
         
         /* send block request and wait until return file content. no race condition */
         while(cloud_flag==EXECUTE_READ || cloud_flag ==EXECUTE_WRITE ){schedule_timeout_uninterruptible(0.001*HZ);}
         printk(KERN_ALERT "CloudUSB_fmass after loop\n");
-        printk(KERN_ALERT "CloudUSB_fmass read_file_offset:%lld\n", read_file_offset);
-        printk(KERN_ALERT "CloudUSB_fmass read_amount:%u\n", read_amount);
+        printk(KERN_ALERT "CloudUSB_fmass read_file_offset:%lld\n", reads->read_file_offset);
+        printk(KERN_ALERT "CloudUSB_fmass read_amount:%u\n", reads->read_amount);
         /* perform the read */
         /* remove this function and send block request */
          //nread = vfs_read(curlun->filp,(char __user *)bh->buf, amount, &file_offset_tmp);
         
-		VLDBG(curlun, "file read %u @ %llu -> %d\n", read_amount,
-		      (unsigned long long)read_file_offset, (int)nread);
+		VLDBG(curlun, "file read %u @ %llu -> %d\n", reads->read_amount,
+		      (unsigned long long)reads->read_file_offset, (int)reads->nread);
 		if (signal_pending(current))
 			return -EINTR;
         
-		if (nread < 0) {
-			LDBG(curlun, "error in file read: %d\n", (int)nread);
-			nread = 0;
-		} else if (nread < read_amount) {
+		if (reads->nread < 0) {
+			LDBG(curlun, "error in file read: %d\n", (int)reads->nread);
+			reads->nread = 0;
+		} else if (reads->nread < reads->read_amount) {
 			LDBG(curlun, "partial file read: %d/%u\n",
-			     (int)nread, read_amount);
-			nread = round_down(nread, curlun->blksize);
+			     (int)reads->nread, reads->read_amount);
+			reads->nread = round_down(reads->nread, curlun->blksize);
 		}
         
-		read_file_offset  += nread;
-		amount_left  -= nread;
-		common->residue -= nread;
+		reads->read_file_offset  += reads->nread;
+		amount_left  -= reads->nread;
+		common->residue -= reads->nread;
         
 		/*
 		 * Except at the end of the transfer, nread will be
 		 * equal to the buffer size, which is divisible by the
 		 * bulk-in maxpacket size.
 		 */
-		bh->inreq->length = nread;
+		bh->inreq->length = reads->nread;
 		bh->state = BUF_STATE_FULL;
 
 		/* If an error occurred, report it and its position */
-		if (nread < read_amount) {
+		if (reads->nread < reads->read_amount) {
 			curlun->sense_data = SS_UNRECOVERED_READ_ERROR;
 			curlun->sense_data_info =
-					read_file_offset >> curlun->blkbits;
+					reads->read_file_offset >> curlun->blkbits;
 			curlun->info_valid = 1;
 			break;
 		}
@@ -786,11 +796,6 @@ static int do_read(struct fsg_common *common)
 	return -EIO;		/* No default reply */
 }
 
-extern unsigned int write_amount;
-extern char __user *write_buff;
-extern loff_t write_file_offset;
-extern ssize_t nwritten;
-
 static int do_write(struct fsg_common *common)
 {
 	struct fsg_lun		*curlun = common->curlun;
@@ -798,7 +803,7 @@ static int do_write(struct fsg_common *common)
 	struct fsg_buffhd	*bh;
 	int			get_some_more;
 	u32			amount_left_to_req, amount_left_to_write;
-	loff_t			usb_offset, write_file_offset;
+    loff_t			usb_offset;
 	int			rc;
 
 	if (curlun->ro) {
@@ -841,7 +846,7 @@ static int do_write(struct fsg_common *common)
 
 	/* Carry out the file writes */
 	get_some_more = 1;
-	write_file_offset = usb_offset = ((loff_t) lba) << curlun->blkbits;
+	writes->write_file_offset = usb_offset = ((loff_t) lba) << curlun->blkbits;
 	amount_left_to_req = common->data_size_from_cmnd;
 	amount_left_to_write = common->data_size_from_cmnd;
 
@@ -856,7 +861,7 @@ static int do_write(struct fsg_common *common)
 			 * Try to get the remaining amount,
 			 * but not more than the buffer size.
 			 */
-			write_amount = min(amount_left_to_req, FSG_BUFLEN);
+			writes->write_amount = min(amount_left_to_req, FSG_BUFLEN);
 
 			/* Beyond the end of the backing file? */
 			if (usb_offset >= curlun->file_length) {
@@ -870,9 +875,9 @@ static int do_write(struct fsg_common *common)
 			}
 
 			/* Get the next buffer */
-			usb_offset += write_amount;
-			common->usb_amount_left -= write_amount;
-			amount_left_to_req -= write_amount;
+			usb_offset += writes->write_amount;
+			common->usb_amount_left -= writes->write_amount;
+			amount_left_to_req -= writes->write_amount;
 			if (amount_left_to_req == 0)
 				get_some_more = 0;
 
@@ -881,7 +886,7 @@ static int do_write(struct fsg_common *common)
 			 * equal to the buffer size, which is divisible by
 			 * the bulk-out maxpacket size.
 			 */
-			set_bulk_out_req_length(common, bh, write_amount);
+			set_bulk_out_req_length(common, bh, writes->write_amount);
 			if (!start_out_transfer(common, bh))
 				/* Dunno what to do if common->fsg is NULL */
 				return -EIO;
@@ -902,69 +907,69 @@ static int do_write(struct fsg_common *common)
 			if (bh->outreq->status != 0) {
 				curlun->sense_data = SS_COMMUNICATION_FAILURE;
 				curlun->sense_data_info =
-					write_file_offset >> curlun->blkbits;
+					writes->write_file_offset >> curlun->blkbits;
 				curlun->info_valid = 1;
 				break;
 			}
 
-			write_amount = bh->outreq->actual;
-			if (curlun->file_length - write_file_offset < write_amount) {
+			writes->write_amount = bh->outreq->actual;
+			if (curlun->file_length - writes->write_file_offset < writes->write_amount) {
 				LERROR(curlun,
 				       "write %u @ %llu beyond end %llu\n",
-				       write_amount, (unsigned long long)write_file_offset,
+				       writes->write_amount, (unsigned long long)writes->write_file_offset,
 				       (unsigned long long)curlun->file_length);
-				write_amount = curlun->file_length - write_file_offset;
+				writes->write_amount = curlun->file_length - writes->write_file_offset;
 			}
 
 			/* Don't accept excess data.  The spec doesn't say
 			 * what to do in this case.  We'll ignore the error.
 			 */
-			write_amount = min(write_amount, bh->bulk_out_intended_length);
+			writes->write_amount = min(writes->write_amount, bh->bulk_out_intended_length);
 
 			/* Don't write a partial block */
-			write_amount = round_down(write_amount, curlun->blksize);
-			if (write_amount == 0)
+			writes->write_amount = round_down(writes->write_amount, curlun->blksize);
+			if (writes->write_amount == 0)
 				goto empty_write;
 
             
-            write_buff = bh->buf;
+            writes->write_buff = bh->buf;
             cloud_flag = EXECUTE_WRITE;
             printk(KERN_ALERT "CloudUSB_fmass receive new block request\n");
-            printk(KERN_ALERT "CloudUSB_fmass write_file_offset:%lld\n", write_file_offset);
-            printk(KERN_ALERT "CloudUSB_fmass write_amount:%u\n", write_amount);
+            printk(KERN_ALERT "CloudUSB_fmass write_file_offset:%lld\n", writes->write_file_offset);
+            printk(KERN_ALERT "CloudUSB_fmass write_amount:%u\n", writes->write_amount);
             
             /* send block request and wait. no race condition */
             while(cloud_flag){schedule_timeout_uninterruptible(0.001*HZ);}
-            printk(KERN_ALERT "CloudUSB_fmass write_file_offset:%lld\n", write_file_offset);
-            printk(KERN_ALERT "CloudUSB_fmass write_amount:%u\n", write_amount);
+            printk(KERN_ALERT "CloudUSB_fmass write_file_offset:%lld\n", writes->write_file_offset);
+            printk(KERN_ALERT "CloudUSB_fmass write_amount:%u\n", writes->write_amount);
             
             /* Perform the write */
             // nwritten = vfs_write(curlun->filp, (char __user *)bh->buf, amount, &file_offset_tmp);
             
             
-			VLDBG(curlun, "file write %u @ %llu -> %d\n", write_amount,
-			      (unsigned long long)write_file_offset, (int)nwritten);
+			VLDBG(curlun, "file write %u @ %llu -> %d\n", writes->write_amount,
+			      (unsigned long long)writes->write_file_offset, (int)writes->nwritten);
 			if (signal_pending(current))
 				return -EINTR;		/* Interrupted! */
 
-			if (nwritten < 0) {
+			if (writes->nwritten < 0) {
 				LDBG(curlun, "error in file write: %d\n",
-				     (int)nwritten);
-				nwritten = 0;
-			} else if (nwritten < write_amount) {
+				     (int)writes->nwritten);
+				writes->nwritten = 0;
+			} else if (writes->nwritten < writes->write_amount) {
 				LDBG(curlun, "partial file write: %d/%u\n",
-				     (int)nwritten, write_amount);
-				nwritten = round_down(nwritten, curlun->blksize);
+				     (int)writes->nwritten, writes->write_amount);
+				writes->nwritten = round_down(writes->nwritten, curlun->blksize);
 			}
-			write_file_offset += nwritten;
-			amount_left_to_write -= nwritten;
-			common->residue -= nwritten;
+			writes->write_file_offset += writes->nwritten;
+			amount_left_to_write -= writes->nwritten;
+			common->residue -= writes->nwritten;
 
 			/* If an error occurred, report it and its position */
-			if (nwritten < write_amount) {
+			if (writes->nwritten < writes->write_amount) {
 				curlun->sense_data = SS_WRITE_ERROR;
 				curlun->sense_data_info =
-					write_file_offset >> curlun->blkbits;
+					writes->write_file_offset >> curlun->blkbits;
 				curlun->info_valid = 1;
 				break;
 			}

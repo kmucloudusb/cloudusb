@@ -37,6 +37,20 @@ struct request{
     char *write_buff;
 };
 
+struct read_export{
+    unsigned int read_amount = 0;
+    char __user *read_buff;
+    loff_t read_file_offset = 0;
+    ssize_t	nread = 0;
+};
+
+struct write_export{
+    unsigned int write_amount;
+    char __user *write_buff = NULL;
+    loff_t write_file_offset;
+    ssize_t nwritten = 0;
+};
+
 struct return_file{
     unsigned char *buff;
     int nread;
