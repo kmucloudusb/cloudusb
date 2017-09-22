@@ -38,17 +38,17 @@ struct request{
 };
 
 struct read_export{
-    unsigned int read_amount = 0;
+    unsigned int read_amount;
     char __user *read_buff;
-    loff_t read_file_offset = 0;
-    ssize_t	nread = 0;
+    loff_t read_file_offset;
+    ssize_t	nread;
 };
 
 struct write_export{
     unsigned int write_amount;
-    char __user *write_buff = NULL;
+    char __user *write_buff;
     loff_t write_file_offset;
-    ssize_t nwritten = 0;
+    ssize_t nwritten;
 };
 
 struct return_file{
