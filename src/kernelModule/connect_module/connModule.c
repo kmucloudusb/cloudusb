@@ -55,8 +55,8 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 printk(KERN_ALERT "CloudUSB_con no such pid\n");
                 return -ENODEV;
             }
-            reads = ((struct read_export)*)malloc(sizeof(struct read_export));
-            writes = ((struct write_export)*)malloc(sizeof(struct write_export));
+            reads = malloc(sizeof(struct read_export));
+            writes = malloc(sizeof(struct write_export));
             printk(KERN_ALERT "CloudUSB_con init success\n");
             break;
         case RETURN_FILE:
