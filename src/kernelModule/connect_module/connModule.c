@@ -55,8 +55,8 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 printk(KERN_ALERT "CloudUSB_con no such pid\n");
                 return -ENODEV;
             }
-            reads = (struct read_export*)malloc(sizeof(struct read_export));
-            writes = (struct write_export*)malloc(sizeof(struct write_export));
+            reads = ((struct read_export)*)malloc(sizeof(struct read_export));
+            writes = ((struct write_export)*)malloc(sizeof(struct write_export));
             printk(KERN_ALERT "CloudUSB_con init success\n");
             break;
         case RETURN_FILE:
@@ -90,41 +90,10 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     /* set block request struct and send signal */
     printk(KERN_ALERT "CloudUSB_con receive block request(after wait)\n");
     
-    if(cloud_flag == EXECUTE_READ){
-        req->read_file_offset = reads->read_file_offset;
-        req->read_amount = reads->read_amount;
-        printk(KERN_ALERT "CloudUSB_con request read_file_offset: %lld\n", req->read_file_offset);
-        printk(KERN_ALERT "CloudUSB_con request read_amount: %u\n", req->read_amount);
-        
-        send_sig_info(SIGUSR1, &read_info, t);
-    }else{
-        printk(KERN_ALERT "CloudUSB_con request write_file_offset: %lld\n", writes->write_file_offset);
-        printk(KERN_ALERT "CloudUSB_con request write_amount: %u\n", writes->write_amount);
-        printk(KERN_ALERT "CloudUSB_con received write_buff: %x\n", writes->write_buff);
-        printk(KERN_ALERT "CloudUSB_con received req->write_buff: %x", req->write_buff);
-        
-        writes->nwritten = writes->write_amount; // 일단 그대로 넣어줌.
-        req->write_file_offset = writes->write_file_offset;
-        req->write_amount = writes->write_amount;
-        memcpy(req->write_buff, writes->write_buff, writes->write_amount);
-        
-        printk(KERN_ALERT "CloudUSB_con req->write_file_offset: %lld\n", req->write_file_offset);
-        printk(KERN_ALERT "CloudUSB_con req->write_amount: %u\n", req->write_amount);
-        
-        printk(KERN_ALERT "CloudUSB_con send write file_content: ");
-        int i;
-        for(i=0;i<writes->nwritten;i++){
-            printk(KERN_CONT "%02x ", writes->write_buff[i]);
-        }
-        printk(KERN_ALERT "\n");
-        
-        send_sig_info(SIGUSR2, &write_info, t);
-    }
-    
-//    if(cloud_flag == EXECUTE_READ)
-//        perform_read(req, &read_info, t);
-//    else
-//        perform_write(req, &write_info, t);
+    if(cloud_flag == EXECUTE_READ)
+        perform_read(req, &read_info, t);
+    else
+        perform_write(req, &write_info, t);
     
     return 0;
 }
@@ -149,6 +118,9 @@ void perform_write(struct request *req, struct siginfo *info, struct task_struct
     req->write_file_offset = writes->write_file_offset;
     req->write_amount = writes->write_amount;
     memcpy(req->write_buff, writes->write_buff, writes->write_amount);
+    
+    printk(KERN_ALERT "CloudUSB_con req->write_file_offset: %lld\n", req->write_file_offset);
+    printk(KERN_ALERT "CloudUSB_con req->write_amount: %u\n", req->write_amount);
     
     printk(KERN_ALERT "CloudUSB_con send write file_content: ");
     int i;
