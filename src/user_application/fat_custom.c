@@ -198,8 +198,14 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
             if(_dataentries[i] == NULL)
             {
                 // Create new file
+                create_dataentry(cluster, sector_count*FAT_SECTOR_SIZE, NULL);
                 
-                return 0;
+                if (_dataentries[i])
+                {
+                    _dataentries[i].fd = open("DefaultFileName", O_RDWR | O_CREAT | O_EXCL | 0644);
+                }
+                
+                return 1;
             }
             
             if(_dataentries[i]->startcluster == root_cluster[cluster])
