@@ -202,7 +202,7 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
                 
                 if (_dataentries[i])
                 {
-                    _dataentries[i].fd = open("DefaultFileName", O_RDWR | O_CREAT | O_EXCL | 0644);
+                    _dataentries[i]->fd = open("DefaultFileName", O_RDWR | O_CREAT | O_EXCL | 0644);
                 }
                 
                 return 1;
