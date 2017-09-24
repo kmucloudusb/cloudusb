@@ -17,16 +17,6 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
-/* ioctl command */
-#define INIT 0
-#define RETURN_FILE 1
-#define FILE_WRITE_OVER 2
-
-/* Read & Write flag */
-#define WAIT_HOST _IOW(0, 0, request)
-#define EXECUTE_READ _IOW(0, 1, return_file)
-#define EXECUTE_WRITE _IO(0, 2)
-
 MODULE_LICENSE("GPL");
 
 struct request{
@@ -56,6 +46,16 @@ struct return_file{
     unsigned char *buff;
     int nread;
 };
+
+/* ioctl command */
+#define INIT 0
+#define RETURN_FILE 1
+#define FILE_WRITE_OVER 2
+
+/* Read & Write flag */
+#define WAIT_HOST _IOW(0, 0, request)
+#define EXECUTE_READ _IOW(0, 1, return_file)
+#define EXECUTE_WRITE _IO(0, 2)
 
 void perform_read(struct request *req, struct siginfo *info, struct task_struct *t);
 void perform_write(struct request *req, struct siginfo *info, struct task_struct *t);
