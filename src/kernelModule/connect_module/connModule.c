@@ -55,6 +55,7 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 printk(KERN_ALERT "CloudUSB_con no such pid\n");
                 return -ENODEV;
             }
+            /* Fix unknown Export bug by allocate heap area */
             reads = kmalloc(sizeof(struct read_export), GFP_KERNEL);
             writes = kmalloc(sizeof(struct write_export), GFP_KERNEL);
             printk(KERN_ALERT "CloudUSB_con init success\n");
@@ -80,7 +81,6 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         case FILE_WRITE_OVER:
             printk(KERN_ALERT "CloudUSB_con ioctl get FILE_WRITE_OVER\n");
     }
-    
     cloud_flag = WAIT_HOST;
     printk(KERN_ALERT "CloudUSB wait next block request.\n");
     
@@ -128,6 +128,7 @@ void perform_write(struct request *req, struct siginfo *info, struct task_struct
         printk(KERN_CONT "%02x ", writes->write_buff[i]);
     }
     printk(KERN_ALERT "\n");
+    msleep(100);
     
     send_sig_info(SIGUSR2, info, t);
 }
