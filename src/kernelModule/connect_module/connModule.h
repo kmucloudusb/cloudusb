@@ -53,8 +53,8 @@ struct return_file{
 #define FILE_WRITE_OVER 2
 
 /* Read & Write flag */
-#define WAIT_HOST _IOW(0, 0, request)
-#define EXECUTE_READ _IOW(0, 1, return_file)
+#define WAIT_HOST _IOW(0, 0, struct request)
+#define EXECUTE_READ _IOW(0, 1, struct return_file)
 #define EXECUTE_WRITE _IO(0, 2)
 
 void perform_read(struct request *req, struct siginfo *info, struct task_struct *t);
