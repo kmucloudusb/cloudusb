@@ -524,7 +524,7 @@ void write_request(int signo)
     
     int nwritten;
     
-    if(ioctl(module_fd, FILE_WRITE_OVER, &nwritten) < 0)
+    if(ioctl(module_fd, RETURN_FILE, &nwritten) < 0)
         printf("Error in IOCTL3 errno: %d\n", errno);
 }
 
