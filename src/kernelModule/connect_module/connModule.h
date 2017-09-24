@@ -48,14 +48,14 @@ struct return_file{
 };
 
 /* ioctl command */
-#define INIT 0
-#define RETURN_FILE 1
-#define FILE_WRITE_OVER 2
+#define INIT _IOW(0, 0, struct request)
+#define RETURN_FILE _IOW(0, 1, struct return_file)
+#define FILE_WRITE_OVER _IO(0, 2)
 
 /* Read & Write flag */
-#define WAIT_HOST _IOW(0, 0, struct request)
-#define EXECUTE_READ _IOW(0, 1, struct return_file)
-#define EXECUTE_WRITE _IO(0, 2)
+#define WAIT_HOST 0
+#define EXECUTE_READ 1
+#define EXECUTE_WRITE 2
 
 void perform_read(struct request *req, struct siginfo *info, struct task_struct *t);
 void perform_write(struct request *req, struct siginfo *info, struct task_struct *t);
