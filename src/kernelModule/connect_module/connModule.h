@@ -19,6 +19,16 @@
 
 MODULE_LICENSE("GPL");
 
+/* ioctl command */
+#define INIT _IOW('a', 0, struct request)
+#define RETURN_FILE _IOW('a', 1, struct return_file)
+#define FILE_WRITE_OVER _IO('a', 2)
+
+/* Read & Write flag */
+#define WAIT_HOST 0
+#define EXECUTE_READ 1
+#define EXECUTE_WRITE 2
+
 struct request{
     int pid;
     unsigned int read_amount;
@@ -46,16 +56,6 @@ struct return_file{
     unsigned char *buff;
     int nread;
 };
-
-/* ioctl command */
-#define INIT _IOW('a', 0, struct request)
-#define RETURN_FILE _IOW('a', 1, struct return_file)
-#define FILE_WRITE_OVER _IO('a', 2)
-
-/* Read & Write flag */
-#define WAIT_HOST 0
-#define EXECUTE_READ 1
-#define EXECUTE_WRITE 2
 
 void perform_read(struct request *req, struct siginfo *info, struct task_struct *t);
 void perform_write(struct request *req, struct siginfo *info, struct task_struct *t);
