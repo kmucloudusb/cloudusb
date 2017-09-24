@@ -212,6 +212,7 @@ int write_virtual(uint32 sector, uint8 *buffer, uint32 sector_count)
             {
                 loc = sector - fs.rootdir_first_sector - (_dataentries[i]->startcluster - fs.rootdir_first_cluster)*fs.sectors_per_cluster;
                 write_file(_dataentries[i]->fd, loc, buffer, sector_count);
+                upload_file(_dataentries[i]->id);
                 
                 return 1;
             }
@@ -314,8 +315,9 @@ int write_file(int fd, unsigned long sector, unsigned char *buffer, unsigned lon
 int upload_file(char *fid)
 {
     char cmd[CMD_LEN_FULL] = "python ";
-    strncat(cmd, _script_path, strlen(_script_path)-7);
-    strcat(cmd, "upload.py --fid ");
+    
+    strncat(cmd, _script_path, strlen(_script_path)-12);
+    strcat(cmd, "upload/upload.py --fid ");
     strcat(cmd, fid);
     
     system(cmd);
@@ -364,7 +366,8 @@ int create_dataentry(uint32 startcluster, uint32 fsize, char *fid)
             _dataentries[i]->size = fsize;
             _dataentries[i]->download = FALSE;
             
-            memcpy(_dataentries[i]->id, fid, FILE_ID_LEN_FULL);
+            if (fid)
+                memcpy(_dataentries[i]->id, fid, FILE_ID_LEN_FULL);
             
             return 1;
         }
