@@ -48,9 +48,9 @@ struct return_file{
 };
 
 /* ioctl command */
-#define INIT _IOW(0, 0, struct request)
-#define RETURN_FILE _IOW(0, 1, struct return_file)
-#define FILE_WRITE_OVER _IO(0, 2)
+#define INIT _IOW('a', 0, struct request)
+#define RETURN_FILE _IOW('a', 1, struct return_file)
+#define FILE_WRITE_OVER _IO('a', 2)
 
 /* Read & Write flag */
 #define WAIT_HOST 0

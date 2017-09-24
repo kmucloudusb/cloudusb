@@ -25,9 +25,9 @@
 #define FAT_CLUSTER_SIZE 4096
 #define FAT_AREA_FULL 1048576
 #define BUFFER_SIZE_FULL 16384
-#define INIT _IOW(0, 0, struct request)
-#define RETURN_FILE _IOW(0, 1, struct return_file)
-#define FILE_WRITE_OVER _IO(0, 2)
+#define INIT _IOW('a', 0, struct request)
+#define RETURN_FILE _IOW('a', 1, struct return_file)
+#define FILE_WRITE_OVER _IO('a', 2)
 #define BUFF_LEN_FULL_SECTOR 32
 #define BUFF_LEN_FULL FAT_SECTOR_SIZE*BUFF_LEN_FULL_SECTOR
 
