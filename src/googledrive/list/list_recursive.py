@@ -11,7 +11,7 @@ from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
 from apiclient.http import MediaIoBaseDownload
-from apiclient import errors
+
 
 PIPE_PATH = ''
 
@@ -75,15 +75,27 @@ def main():
     #   https://developers.google.com/drive/v3/web/search-parameters
     #
 
-    ## 1. 구글 드라이브 계정 내의 모든 파일, 디렉토리 정보를 다 가져옴
-    all_files = []
-    retrieve_all_files(service, all_files)
+    # 1. ROOT_DIRECTORY 이름을 가진 최상위 폴더를 찾음
+    first_folder = service.files().list(
+        q=("mimeType = 'application/vnd.google-apps.folder' and name = '%s'" % ROOT_FOLDER)).execute()
+    first_folder_item = first_folder.get('files', [])
+    root_dir_id = 0
+    if not first_folder_item:
+        print('No %s found.' % ROOT_FOLDER)
+    else:
+        for item in first_folder_item:
+            root_dir_id = item['id']
 
     # 2. 최상위 폴더부터 시작해서 모든 파일, 디렉토리 정보를 탐색
     result_files = []
+    result_directories = []
+    listing_files(service, root_dir_id, "", result_files, result_directories)
+    del result_directories[0]
 
-    root_dir_id = find_id_by_name(all_files, ROOT_FOLDER)
-    listing_files(root_dir_id, "", result_files, all_files)
+
+    # sorted_result_directories = result_files
+    # sorted_result_files= sorted(result_files, reverse=False, key=metaDataListsortKey)
+
 
     # 3. 탐색한 파일, 디렉토리 정보를 보여줌
     for file in result_files:
@@ -97,57 +109,29 @@ def main():
     finally:
         bridge.close()
         
-def listing_files(folderID, directory, result_files, all_files):
+def listing_files(service, folderID, directory, result_files, result_directories):
+    result_directories.append(directory)
 
-    if not all_files:
-        return        
+    results = service.files().list(
+        orderBy="folder desc, createdTime",
+        q=("'%s' in parents and trashed = false " % folderID),
+        fields="files(id, name, mimeType, size)").execute()
 
-    for item in all_files:
-        if(('parents' in item) and (item['parents'][0]==folderID)):
+
+    items = results.get('files', [])
+    if not items:
+        # result_files.append('%s : No files found.'%directory)
+        pass
+    else:
+        for item in items:
+            # 이름에 공백 있으면 _ 으로 치환
             item['name'] = item['name'].replace(" ", "_")
 
             if item['mimeType'] == FOLDER:
                 result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "1", item['id'], "1"))
-                listing_files(item['id'], directory + "/%s" % item['name'], result_files, all_files)
+                listing_files(service, item['id'], directory + "/%s" % item['name'], result_files, result_directories)
             else:
                 result_files.append('%s %s %s %s' % (directory + '/' + item['name'], item['size'] ,item['id'], '0'))
-
-
-def find_name_by_id(all_files, id):
-    for item in all_files:
-        if(item['id'] == id):
-            return item['name']
-    return False
-
-def find_id_by_name(all_files, name):
-    for item in all_files:
-        if(item['name'] == name):
-            return item['id']
-    return False
-
-def retrieve_all_files(service, all_files):
-    pageToken = None
-    i = 0
-    while True:
-        results = service.files().list(pageToken=pageToken,
-            pageSize=1000,fields="nextPageToken, files(id, name, size, mimeType, parents)").execute()
-
-
-        items = results.get('files', [])
-        if not items:
-            print('No files found.')
-        else:
-            print('Files:')
-            for item in items:
-                all_files.append(item)
-                #print('{0} ({1})'.format(item['name'], item['id']))
-        if(not results.get('nextPageToken')):
-            break
-      
-        pageToken = results['nextPageToken']
-        i = i+1
-        
-    print(i) 
 
 if __name__ == '__main__':
     main()
