@@ -163,6 +163,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     
     // Reserved Area
     if (FAT_RESERVED_AREA_POSITION <= sector && sector < FAT_FAT_AREA_POSITION) {
+        puts("{reserved area}");
         memcpy(buffer,
                reserved_area + sector % FAT_RESERVED_AREA_BACKUP_POSITION * FAT_SECTOR_SIZE,
                FAT_CLUSTER_SIZE);
@@ -170,6 +171,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     
     // Fat Area
     else if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSISTION) {
+        puts("{fat area}");
         memcpy(buffer,
                fat_area + (sector - FAT_FAT_AREA_POSITION) % (FAT_FAT_AREA_BACKUP_POSITION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE,
                count * FAT_SECTOR_SIZE);
@@ -592,4 +594,3 @@ void create_fat_area()
     
     memcpy(fat_area, fat, sizeof(unsigned char)*16);
 }
-
