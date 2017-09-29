@@ -599,3 +599,7 @@ void create_fat_area()
     memcpy(fat_area, fat, sizeof(unsigned char)*16);
 }
 
+void set_root_dir_entry()
+{
+    cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
+}
