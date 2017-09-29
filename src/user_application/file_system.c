@@ -130,22 +130,16 @@ void clean_dirty_cluster()
     puts("[clean dirty cluster]");
     
     for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER; i<CLUSTER_INFO_FULL; i++) {
-        printf("{for %d}\n", i);
         if (cluster_info[i].attr == ATTR_DIR) {
-            printf("{if %d}\n", i);
             record_entry_info(cluster_info[i].buffer);
         }
         else if (cluster_info[i].attr == ATTR_FILE) {
-            printf("{else if %d}\n", i);
             if (cluster_info[i].dirty) {
                 write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no);
                 upload_file(cluster_info[i].filename);
                 
                 cluster_info[i].dirty = 0;
             }
-        }
-        else {
-            printf("{else %d}\n", cluster_info[i].attr);
         }
     }
 }
@@ -604,3 +598,4 @@ void create_fat_area()
     
     memcpy(fat_area, fat, sizeof(unsigned char)*16);
 }
+
