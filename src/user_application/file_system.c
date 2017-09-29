@@ -510,9 +510,9 @@ void write_entries()
         
         for (i=cluster; i<(cluster + ((fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0)); i++) {
             if (dir)
-                cluster_info[i].attr = ATTR_FILE;
-            else {
                 cluster_info[i].attr = ATTR_DIR;
+            else {
+                cluster_info[i].attr = ATTR_FILE;
                 memcpy(cluster_info[i].filename, fid, FILE_NAME_FULL);
             }
         }
@@ -613,3 +613,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
