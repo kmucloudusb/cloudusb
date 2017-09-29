@@ -26,7 +26,7 @@
 
 #define FAT_ROOT_DIR_POSISTION 4120
 
-
+#define FAT_SECTOR_PER_CLUSTER 8
 
 #define FAT_ROOT_DIRECTORY_FIRST_CLUSTER 2
 
@@ -63,7 +63,7 @@ struct cluster_info
     int attr;
     int dirty;
     int cluster_no;
-
+    
     char filename[FILE_NAME_FULL];
     unsigned char buffer[FAT_CLUSTER_SIZE];
 };
@@ -111,3 +111,4 @@ void create_reserved_area();
 void create_fat_area();
 
 #endif //ALGORITHM_FILE_SYSTEM_H
+
