@@ -184,7 +184,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     }
     
     // Entries
-    else {
+    else if (FAT_ROOT_DIR_POSISTION <= sector && sector < FAT_ROOT_DIR_POSISTION + CLUSTER_INFO_FULL) {
         unsigned int cluster = (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
         
         record_cluster_no();
@@ -197,6 +197,10 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         
         //        memcpy(buffer, cluster_info[cluster].buffer, count*FAT_SECTOR_SIZE);
         //        read_file(cluster, buffer, count*FAT_SECTOR_SIZE);
+    }
+    // meaning less
+    else {
+        memset(buffer, 0x00, count*FAT_SECTOR_SIZE);
     }
     
     for (i=0; i<512; i++) {
@@ -600,4 +604,3 @@ void create_fat_area()
     
     memcpy(fat_area, fat, sizeof(unsigned char)*16);
 }
-
