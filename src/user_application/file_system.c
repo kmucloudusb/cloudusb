@@ -155,6 +155,10 @@ int read_file(int cluster, unsigned char *buffer, int size)
 
 int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
+    int i;
+    printf("[read] sector = %u\n", sector);
+    puts("");
+    
     // Reserved Area
     if (FAT_RESERVED_AREA_POSITION <= sector && sector < FAT_FAT_AREA_POSITION) {
         memcpy(buffer,
@@ -183,6 +187,12 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         
         //        memcpy(buffer, cluster_info[cluster].buffer, count*FAT_SECTOR_SIZE);
         //        read_file(cluster, buffer, count*FAT_SECTOR_SIZE);
+    }
+    
+    for (i=0; i<512; i++) {
+        if (i != 0 && i % 16 == 0)
+            puts("");
+        printf("%02X ", buffer[i]);
     }
     
     return 1;
@@ -580,4 +590,3 @@ void create_fat_area()
     
     memcpy(fat_area, fat, sizeof(unsigned char)*16);
 }
-
