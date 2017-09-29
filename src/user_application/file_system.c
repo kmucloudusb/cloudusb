@@ -470,7 +470,7 @@ void write_entries()
     int i;
     char ch = -1;
     int offset = 0;
-    char filelist[PIPE_LEN_FULL];
+    char filelist[PIPE_LEN_FULL] = {0};
     
     char full_path[PIPE_LEN_FULL];
     char path[FILE_NAME_FULL];
@@ -487,8 +487,9 @@ void write_entries()
     
     read_pipe(filelist);
     
-    while(ch != '\0')
+    while(ch != '\0' && filelist[offset] != 0)
     {
+        memset(fid, 0x00, FILE_ID_FULL);
         sscanf(filelist+offset, "%512s %u %s %d", full_path, &fsize, fid, &dir);
         
         // Write on allocation table
@@ -496,7 +497,6 @@ void write_entries()
         
         fatfs_split_path(full_path,path,FILE_NAME_FULL,filename,FILE_NAME_FULL);
         fatfs_lfn_create_sfn(shortfilename, filename);
-        
         
         memcpy(entry.name, shortfilename, FAT_SFN_SIZE_FULL);
         entry.first_cluster_high = (unsigned short) ((cluster & 0xFFFF0000) >> 16);
@@ -511,10 +511,11 @@ void write_entries()
         for (i=cluster; i<(cluster + ((fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0)); i++) {
             if (dir)
                 cluster_info[i].attr = ATTR_FILE;
-            else
+            else {
                 cluster_info[i].attr = ATTR_DIR;
+                memcpy(cluster_info[i].filename, fid, FILE_NAME_FULL);
+            }
         }
-        
         
         cluster += (fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0;
         
@@ -612,4 +613,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
