@@ -26,6 +26,7 @@ void record_cluster_no()
 {
     int i;
     int count = 0;
+    puts("[record cluster no]");
     
     for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER*FAT_CLUSTER_CHAIN_MARKER_LEN;
          i<CLUSTER_INFO_FULL;
@@ -126,6 +127,7 @@ int write_file(char *filename, unsigned char *buffer, int cluster_no)
 void clean_dirty_cluster()
 {
     int i;
+    puts("[clean dirty cluster]");
     
     for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER; i<CLUSTER_INFO_FULL; i++) {
         if (cluster_info[i].attr == ATTR_DIR) {
@@ -590,3 +592,4 @@ void create_fat_area()
     
     memcpy(fat_area, fat, sizeof(unsigned char)*16);
 }
+
