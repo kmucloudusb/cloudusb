@@ -41,7 +41,7 @@
 #define FILE_NAME_FULL 512
 #define FILE_ID_FULL 512
 #define PIPE_LEN_FULL 4096
-#define CLUSTER_INFO_FULL 1024
+#define CLUSTER_INFO_FULL 4906
 #define FAT_FAT_AREA_FULL (FAT_FAT_AREA_BACKUP_POSITION - FAT_FAT_AREA_POSITION)
 
 #define FAT_END_OF_CLUSTER_CHAIN_MARKER 0xF0FFFF0F
@@ -111,4 +111,3 @@ void create_reserved_area();
 void create_fat_area();
 
 #endif //ALGORITHM_FILE_SYSTEM_H
-
