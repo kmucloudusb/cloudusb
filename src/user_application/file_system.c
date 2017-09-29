@@ -467,6 +467,7 @@ int insert_dir_entry(unsigned char *rootdir_entry, struct fat_dir_entry *entry)
 
 void write_entries()
 {
+    int i;
     char ch = -1;
     int offset = 0;
     char filelist[PIPE_LEN_FULL];
@@ -506,6 +507,14 @@ void write_entries()
         insert_dir_entry(cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].buffer, &entry);
         
         download_file(fid);
+        
+        for (i=cluster; i<(cluster + ((fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0)); i++) {
+            if (dir)
+                cluster_info[i].attr = ATTR_FILE;
+            else
+                cluster_info[i].attr = ATTR_DIR;
+        }
+        
         
         cluster += (fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0;
         
@@ -603,3 +612,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
