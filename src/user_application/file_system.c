@@ -94,6 +94,7 @@ void record_entry_info(unsigned char *entry)
 
 void upload_file(char *filename)
 {
+    printf("[upload] %s\n", filename);
     char cmd[CMD_LEN_FULL] = "python ";
     
     strncat(cmd, path_downloader, strlen(path_downloader));
@@ -163,7 +164,6 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     
     // Reserved Area
     if (FAT_RESERVED_AREA_POSITION <= sector && sector < FAT_FAT_AREA_POSITION) {
-        puts("{reserved area}");
         memcpy(buffer,
                reserved_area + sector % FAT_RESERVED_AREA_BACKUP_POSITION * FAT_SECTOR_SIZE,
                FAT_CLUSTER_SIZE);
@@ -171,7 +171,6 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     
     // Fat Area
     else if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSISTION) {
-        puts("{fat area}");
         memcpy(buffer,
                fat_area + (sector - FAT_FAT_AREA_POSITION) % (FAT_FAT_AREA_BACKUP_POSITION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE,
                count * FAT_SECTOR_SIZE);
@@ -227,7 +226,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     }
     
     else {
-        unsigned int cluster = sector / FAT_SECTOR_SIZE;
+        unsigned int cluster = (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
         
         memcpy(cluster_info[cluster].buffer,
                buffer,
@@ -236,7 +235,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         if (cluster_info[cluster].attr != ATTR_DIR) {
             cluster_info[cluster].dirty = 1;
             
-            upload_file(cluster_info[cluster].filename);
+            //            upload_file(cluster_info[cluster].filename);
         }
         
         return 1;
@@ -265,6 +264,8 @@ void read_pipe(char *buffer)
 
 void download_file(char *fid)
 {
+    printf("[download] %s\n", fid);
+    
     char cmd[CMD_LEN_FULL] = "python ";
     strncat(cmd, path_downloader, strlen(path_downloader));
     strcat(cmd, " --fid ");
@@ -647,3 +648,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
