@@ -552,7 +552,7 @@ void write_entries()
             }
         }
         
-        printf("[Written Data]\n filename = %s\n attr = %d\n", cluster_info[i].filename, cluster_info[i].attr);
+        printf("[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
         
         cluster += (fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0;
         
@@ -650,4 +650,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
