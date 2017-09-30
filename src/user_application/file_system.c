@@ -1,5 +1,5 @@
 //
-// Created by 채한울 on 29/09/2017.
+// Created by lunahc on 29/09/2017.
 //
 
 #include "file_system.h"
@@ -97,7 +97,7 @@ void upload_file(char *filename)
     printf("[upload] %s\n", filename);
     char cmd[CMD_LEN_FULL] = "python ";
     
-    strncat(cmd, path_downloader, strlen(path_downloader));
+    strncat(cmd, path_uploader, strlen(path_uploader));
     strcat(cmd, " --fid ");
     strcat(cmd, filename);
     
@@ -142,8 +142,12 @@ void clean_dirty_cluster()
         }
         else if (cluster_info[i].attr == ATTR_FILE) {
             if (cluster_info[i].dirty) {
-                if (write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no) == -1)
-                    puts("<<<cannot write...>>>");
+                if (write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no) == -1) {
+                    puts("Write fail...");
+                    
+                    return ;
+                }
+                
                 upload_file(cluster_info[i].filename);
                 
                 cluster_info[i].dirty = 0;
@@ -166,6 +170,7 @@ int read_file(int cluster, unsigned char *buffer, int size)
 int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
     int i;
+    
     printf("[read] sector = %u\n", sector);
     puts("");
     
@@ -194,20 +199,11 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             memcpy(buffer, cluster_info[cluster].buffer, count*FAT_SECTOR_SIZE);
         else
             read_file(cluster, buffer, count*FAT_SECTOR_SIZE);
-        
-        //        memcpy(buffer, cluster_info[cluster].buffer, count*FAT_SECTOR_SIZE);
-        //        read_file(cluster, buffer, count*FAT_SECTOR_SIZE);
     }
-    // meaning less
+    // Meaning less
     else {
         memset(buffer, 0x00, count*FAT_SECTOR_SIZE);
     }
-    
-    //    for (i=0; i<512; i++) {
-    //        if (i != 0 && i % 16 == 0)
-    //            puts("");
-    //        printf("%02X ", buffer[i]);
-    //    }
     
     return 1;
 }
@@ -217,6 +213,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     printf("[wrtie] sector = %u\n", sector);
     puts("");
     
+    // Reserved Area
     if (sector == FAT_RESERVED_AREA_POSITION+1 || sector == FAT_FAT_AREA_BACKUP_POSITION+1) {
         memcpy(reserved_area, buffer, FAT_SECTOR_SIZE);
         
@@ -232,6 +229,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         return 1;
     }
     
+    // Entries
     else {
         unsigned int cluster = (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
         
@@ -288,13 +286,11 @@ int fatfs_total_path_levels(char *path)
     if (!path)
         return -1;
     
-    if (*path == '/')
-    {
+    if (*path == '/') {
         expectedchar = '/';
         path++;
     }
-    else if (path[1] == ':' || path[2] == '\\')
-    {
+    else if (path[1] == ':' || path[2] == '\\') {
         expectedchar = '\\';
         path += 3;
     }
@@ -302,11 +298,9 @@ int fatfs_total_path_levels(char *path)
         return -1;
     
     // Count levels in path string
-    while (*path)
-    {
+    while (*path) {
         // Fast forward through actual subdir text to next slash
-        for (; *path; )
-        {
+        for (; *path; ) {
             // If slash detected escape from for loop
             if (*path == expectedchar) { path++; break; }
             path++;
@@ -331,13 +325,11 @@ int fatfs_get_substring(char *path, int levelreq, char *output, int max_len)
     if (!path || max_len <= 0)
         return -1;
     
-    if (*path == '/')
-    {
+    if (*path == '/') {
         expectedchar = '/';
         path++;
     }
-    else if (path[1] == ':' || path[2] == '\\')
-    {
+    else if (path[1] == ':' || path[2] == '\\') {
         expectedchar = '\\';
         path += 3;
     }
@@ -348,8 +340,7 @@ int fatfs_get_substring(char *path, int levelreq, char *output, int max_len)
     pathlen = (int)strlen (path);
     
     // Loop through the number of times as characters in 'path'
-    for (i = 0; i<pathlen; i++)
-    {
+    for (i = 0; i<pathlen; i++) {
         // If a '\' is found then increase level
         if (*path == expectedchar) levels++;
         
@@ -387,8 +378,7 @@ int fatfs_split_path(char *full_path, char *path, int max_path, char *filename, 
     // If root file
     if (levels == 0)
         path[0] = '\0';
-    else
-    {
+    else {
         strindex = (int)strlen(full_path) - (int)strlen(filename);
         if (strindex > max_path)
             strindex = max_path;
@@ -416,15 +406,13 @@ int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
     memset(ext, ' ', 3);
     
     // Find dot seperator
-    for (i = 0; i< len; i++)
-    {
+    for (i = 0; i< len; i++) {
         if (filename[i]=='.')
             dotPos = i;
     }
     
     // Extract extensions
-    if (dotPos!=-1)
-    {
+    if (dotPos!=-1) {
         // Copy first three chars of extension
         for (i = (dotPos+1); i < (dotPos+1+3); i++)
             if (i<len)
@@ -436,10 +424,8 @@ int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
     
     // Add filename part
     pos = 0;
-    for (i=0;i<len;i++)
-    {
-        if ( (filename[i]!=' ') && (filename[i]!='.') )
-        {
+    for (i=0;i<len;i++) {
+        if ( (filename[i]!=' ') && (filename[i]!='.') ) {
             if (filename[i] >= 'a' && filename[i] <= 'z')
                 sfn_output[pos++] = filename[i] - 'a' + 'A';
             else
@@ -452,8 +438,7 @@ int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
     }
     
     // Add extension part
-    for (i=FAT_SFN_SIZE_PARTIAL;i<FAT_SFN_SIZE_FULL;i++)
-    {
+    for (i=FAT_SFN_SIZE_PARTIAL;i<FAT_SFN_SIZE_FULL;i++) {
         if (ext[i-FAT_SFN_SIZE_PARTIAL] >= 'a' && ext[i-FAT_SFN_SIZE_PARTIAL] <= 'z')
             sfn_output[i] = ext[i-FAT_SFN_SIZE_PARTIAL] - 'a' + 'A';
         else
@@ -566,6 +551,18 @@ void write_entries()
     }
 }
 
+void fat_init()
+{
+    // Create boot record area
+    create_reserved_area();
+    
+    // Create fat area
+    create_fat_area();
+    
+    // Set root dir entry type
+    set_root_dir_entry();
+}
+
 void create_reserved_area()
 {
     // ~ 1024 Byte
@@ -656,4 +653,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
