@@ -228,15 +228,14 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     else {
         unsigned int cluster = (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
         
-        memcpy(cluster_info[cluster].buffer,
-               buffer,
-               count * FAT_SECTOR_SIZE);
+        if (cluster_info[cluster].attr == ATTR_FILE)
+            write_file(cluster_info[cluster].filename, buffer, cluster_info[cluster].cluster_no);
         
-        if (cluster_info[cluster].attr != ATTR_DIR) {
+        
+        memcpy(cluster_info[cluster].buffer, buffer, count * FAT_SECTOR_SIZE);
+        
+        if (cluster_info[cluster].attr == ATTR_EMPTY)
             cluster_info[cluster].dirty = 1;
-            
-            //            upload_file(cluster_info[cluster].filename);
-        }
         
         return 1;
     }
@@ -648,4 +647,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
