@@ -81,6 +81,7 @@ void record_entry_info(unsigned char *entry)
             unsigned int cluster = get_cluster_from_entry(item);
             
             if (cluster_info[cluster].dirty) {
+                printf("[filename] %s will changed\n\n\n", cluster_info[cluster].filename);
                 get_filename_from_entry(item, cluster_info[cluster].filename);
                 
                 if (item->attr == ENTRY_DIR)
@@ -551,6 +552,8 @@ void write_entries()
             }
         }
         
+        printf("[Written Data]\n filename = %s\n attr = %d\n", cluster_info[i].filename, cluster_info[i].attr);
+        
         cluster += (fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0;
         
         while((ch = *(filelist+(offset++))) != '\n' && ch != '\0');
@@ -647,3 +650,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
