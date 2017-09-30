@@ -206,6 +206,32 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     return 1;
 }
 
+int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
+{
+    if (sector == FAT_RESERVED_AREA_POSITION || sector == FAT_FAT_AREA_BACKUP_POSITION) {
+        memcpy(reserved_area, buffer, FAT_SECTOR_SIZE);
+    }
+    
+    // Fat Area
+    else if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSISTION) {
+        memcpy(fat_area + (sector - FAT_FAT_AREA_POSITION) % (FAT_FAT_AREA_BACKUP_POSITION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE,
+               buffer,
+               count * FAT_SECTOR_SIZE);
+    }
+    
+    else {
+        unsigned int cluster = sector / FAT_SECTOR_SIZE;
+        
+        memcpy(cluster_info[cluster].buffer,
+               buffer,
+               count * FAT_SECTOR_SIZE);
+        
+        if (cluster_info[cluster].attr != ATTR_DIR) {
+            cluster_info[cluster].dirty = 1;
+        }
+    }
+}
+
 
 
 void download_metadata()
@@ -613,4 +639,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
