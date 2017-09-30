@@ -106,7 +106,11 @@ void upload_file(char *filename)
 
 int write_file(char *filename, unsigned char *buffer, int cluster_no)
 {
+    int i;
     printf("[write pysically] %s\n", filename);
+    for (i=0; i<16; i++)
+        printf("0x%02X, ", buffer[i]);
+    puts("");
     
     int fd = open(filename, O_RDWR | O_CREAT | O_EXCL, 0644);
     
@@ -138,7 +142,8 @@ void clean_dirty_cluster()
         }
         else if (cluster_info[i].attr == ATTR_FILE) {
             if (cluster_info[i].dirty) {
-                write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no);
+                if (write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no) == -1)
+                    puts("<<<cannot write...>>>");
                 upload_file(cluster_info[i].filename);
                 
                 cluster_info[i].dirty = 0;
@@ -651,3 +656,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
