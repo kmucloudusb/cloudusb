@@ -44,19 +44,19 @@ void record_cluster_no()
 
 void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
 {
-    int i;
+    int i, j;
     char fn_no = 0;
     
     for (i=0; i<ENTRY_NAME_LENGTH; i++) {
         if (entry->name[i] == ENTRY_FILENAME_BLANK)
-            break;
+            continue;
         
         filename[fn_no++] = entry->name[i];
     }
     
     filename[fn_no++] = '.';
     
-    for (; i<ENTRY_EXTENDER_LENGTH; i++) {
+    for (j=0; j<ENTRY_EXTENDER_LENGTH; j++, i++) {
         if (entry->name[i] == ENTRY_FILENAME_BLANK)
             break;
         
@@ -81,7 +81,6 @@ void record_entry_info(unsigned char *entry)
             unsigned int cluster = get_cluster_from_entry(item);
             
             if (cluster_info[cluster].dirty) {
-                printf("[filename] %s will changed\n\n\n", cluster_info[cluster].filename);
                 get_filename_from_entry(item, cluster_info[cluster].filename);
                 
                 if (item->attr == ENTRY_DIR)
@@ -107,6 +106,8 @@ void upload_file(char *filename)
 
 int write_file(char *filename, unsigned char *buffer, int cluster_no)
 {
+    printf("[write pysically] %s\n", filename);
+    
     int fd = open(filename, O_RDWR | O_CREAT | O_EXCL, 0644);
     
     if (errno == ENOENT)
