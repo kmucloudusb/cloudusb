@@ -9,7 +9,7 @@ static char *path_downloader = "/home/pi/cloudusb/src/googledrive/download/downl
 static char *path_uploader = "/home/pi/cloudusb/src/googledrive/upload/upload.py";
 static char *path_pipe = "/home/pi/cloudusb/bin/myfifo";
 
-static unsigned char reserved_area[FAT_SECTOR_SIZE*2];
+static unsigned char reserved_area[FAT_CLUSTER_SIZE*2];
 static unsigned char fat_area[FAT_FAT_AREA_FULL];
 
 static struct cluster_info cluster_info[CLUSTER_INFO_FULL];
@@ -20,26 +20,6 @@ unsigned int get_32bit(unsigned char *buffer)
             + ((unsigned int) buffer[2]<<16)
             + ((unsigned int) buffer[1]<<8)
             + ((unsigned int) buffer[0]) );
-}
-
-void record_cluster_no()
-{
-    int i;
-    int count = 0;
-    puts("[record cluster no]");
-    
-    for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER*FAT_CLUSTER_CHAIN_MARKER_LEN;
-         i<CLUSTER_INFO_FULL;
-         i+=FAT_CLUSTER_CHAIN_MARKER_LEN)
-    {
-        if ((get_32bit(fat_area + i) & FAT_END_OF_CLUSTER_CHAIN_MARKER) == FAT_END_OF_CLUSTER_CHAIN_MARKER) {
-            cluster_info[i/FAT_CLUSTER_CHAIN_MARKER_LEN].cluster_no = count;
-            count = 0;
-        }
-        else {
-            cluster_info[i/FAT_CLUSTER_CHAIN_MARKER_LEN].cluster_no = count++;
-        }
-    }
 }
 
 void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
@@ -131,7 +111,27 @@ int write_file(char *filename, unsigned char *buffer, int cluster_no)
     return -1;
 }
 
-void clean_dirty_cluster()
+void clean_fat_area()
+{
+    int i;
+    int count = 0;
+    puts("[record cluster no]");
+    
+    for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER*FAT_CLUSTER_CHAIN_MARKER_LEN;
+         i<CLUSTER_INFO_FULL;
+         i+=FAT_CLUSTER_CHAIN_MARKER_LEN)
+    {
+        if ((get_32bit(fat_area + i) & FAT_END_OF_CLUSTER_CHAIN_MARKER) == FAT_END_OF_CLUSTER_CHAIN_MARKER) {
+            cluster_info[i/FAT_CLUSTER_CHAIN_MARKER_LEN].cluster_no = count;
+            count = 0;
+        }
+        else {
+            cluster_info[i/FAT_CLUSTER_CHAIN_MARKER_LEN].cluster_no = count++;
+        }
+    }
+}
+
+void clean_entries()
 {
     int i;
     puts("[clean dirty cluster]");
@@ -140,10 +140,10 @@ void clean_dirty_cluster()
         if (cluster_info[i].attr == ATTR_DIR) {
             record_entry_info(cluster_info[i].buffer);
         }
-        else if (cluster_info[i].attr == ATTR_FILE) {
+        else {
             if (cluster_info[i].dirty) {
                 if (write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no) == -1) {
-                    puts("Write fail...");
+                    perror("Write_file");
                     
                     return ;
                 }
@@ -160,11 +160,14 @@ int read_file(int cluster, unsigned char *buffer, int size)
 {
     int fd = open(cluster_info[cluster].filename, O_RDONLY);
     
-    read(fd, buffer, size);
+    if (fd >= 0) {
+        read(fd, buffer, size);
+        close(fd);
+        
+        return 1;
+    }
     
-    close(fd);
-    
-    return 1;
+    return -1;
 }
 
 int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
@@ -190,15 +193,20 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     
     // Entries
     else if (FAT_ROOT_DIR_POSISTION <= sector && sector < FAT_ROOT_DIR_POSISTION + CLUSTER_INFO_FULL) {
+        int attr;
         unsigned int cluster = (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
         
-        record_cluster_no();
-        clean_dirty_cluster();
+        clean_fat_area();
+        clean_entries();
         
-        if (cluster_info[cluster].attr == ATTR_DIR)
+        attr = cluster_info[cluster].attr;
+        if (attr == ATTR_DIR)
             memcpy(buffer, cluster_info[cluster].buffer, count*FAT_SECTOR_SIZE);
-        else
-            read_file(cluster, buffer, count*FAT_SECTOR_SIZE);
+        else {
+            if (read_file(cluster, buffer, count * FAT_SECTOR_SIZE) == -1) {
+                perror("read_file");
+            }
+        }
     }
     // Meaning less
     else {
@@ -208,42 +216,57 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     return 1;
 }
 
+int check_blank_buffer(unsigned char *buffer, unsigned int size)
+{
+    int i;
+    
+    for (i=0; i<size; i++) {
+        if (buffer[i])
+            return 0;
+    }
+    
+    return 1;
+}
+
 int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
-    printf("[wrtie] sector = %u\n", sector);
-    puts("");
+    if (check_blank_buffer(buffer, count*FAT_SECTOR_SIZE)) {
+        puts("[write] skip blank buffer\n");
+        return 0;
+    }
+    
+    printf("[wrtie] sector = %u\n\n", sector);
     
     // Reserved Area
     if (sector == FAT_RESERVED_AREA_POSITION+1 || sector == FAT_FAT_AREA_BACKUP_POSITION+1) {
-        memcpy(reserved_area, buffer, FAT_SECTOR_SIZE);
-        
-        return 1;
+        memcpy(reserved_area, buffer, count * FAT_SECTOR_SIZE);
     }
     
     // Fat Area
     else if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSISTION) {
-        memcpy(fat_area + (sector - FAT_FAT_AREA_POSITION) % (FAT_FAT_AREA_BACKUP_POSITION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE,
+        int pos = ( (sector - FAT_FAT_AREA_POSITION)
+                   % (FAT_FAT_AREA_BACKUP_POSITION - FAT_FAT_AREA_POSITION)
+                   * FAT_SECTOR_SIZE );
+        
+        memcpy(fat_area + pos,
                buffer,
                count * FAT_SECTOR_SIZE);
-        
-        return 1;
     }
     
     // Entries
     else {
-        unsigned int cluster = (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
+        int cluster = (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
         
         if (cluster_info[cluster].attr == ATTR_FILE)
             write_file(cluster_info[cluster].filename, buffer, cluster_info[cluster].cluster_no);
+        else
+            memcpy(cluster_info[cluster].buffer, buffer, count * FAT_SECTOR_SIZE);
         
-        
-        memcpy(cluster_info[cluster].buffer, buffer, count * FAT_SECTOR_SIZE);
-        
-        if (cluster_info[cluster].attr == ATTR_EMPTY)
+        if (cluster_info[cluster].attr != ATTR_DIR)
             cluster_info[cluster].dirty = 1;
-        
-        return 1;
     }
+    
+    return 1;
 }
 
 void download_metadata()
@@ -534,12 +557,12 @@ void write_entries()
         
         download_file(fid);
         
-        for (i=cluster; i<(cluster + ((fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0)); i++) {
+        for (i=cluster; i<(cluster + ((fsize/FAT_CLUSTER_SIZE) + ((fsize%FAT_CLUSTER_SIZE)? 1: 0))); i++) {
             if (dir)
                 cluster_info[i].attr = ATTR_DIR;
             else {
                 cluster_info[i].attr = ATTR_FILE;
-                memcpy(cluster_info[i].filename, fid, FILE_NAME_FULL);
+                strcpy(cluster_info[i].filename, fid);
             }
         }
         

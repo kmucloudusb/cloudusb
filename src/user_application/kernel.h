@@ -1,9 +1,5 @@
-//
-// Created by 채한울 on 29/09/2017.
-//
-
-#ifndef ALGORITHM_KERNEL_H
-#define ALGORITHM_KERNEL_H
+#ifndef KERNEL_H
+#define KERNEL_H
 
 #define INIT _IOW('a', 0, struct request)
 #define RETURN_FILE _IOW('a', 1, struct return_file)
@@ -31,6 +27,4 @@ void run_module();
 void file_transfer(int signo);
 void write_request(int signo);
 
-
-#endif //ALGORITHM_KERNEL_H
-
+#endif //KERNEL_H
