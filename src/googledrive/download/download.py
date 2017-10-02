@@ -12,6 +12,8 @@ from oauth2client import tools
 from oauth2client.file import Storage
 from apiclient.http import MediaIoBaseDownload
 
+Kbyte = 1024
+
 file_id = ''
 
 try:
@@ -33,7 +35,7 @@ sys.setdefaultencoding('utf-8')
 # If modifying these scopes, delete your previously saved credentials
 # at ~/.credentials/drive-python-quickstart.json
 # 접근 권한: https://developers.google.com/drive/v2/web/about-auth
-SCOPES = 'https://www.googleapis.com/auth/drive.readonly'
+SCOPES = 'https://www.googleapis.com/auth/drive' # all permision
 
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Drive API Python Quickstart'
@@ -107,6 +109,11 @@ def partial_download(service, file_id, byte_begin, byte_end, file_path):
     else:
         return None
 
+
+def replace_cache(file_size):
+    st = os.statvfs('/')
+    du = (st.f_bavail * st.f_frsize) / Kbyte
+    print(du)
 
 if __name__ == '__main__':
     main()
