@@ -173,11 +173,7 @@ int read_file(int cluster, unsigned char *buffer, int size)
 int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
     int i;
-    for (i=0; i<512; i++) {
-        if (i != 0 && i % 16 == 0)
-            puts("");
-        printf("%02X ", buffer[i]);
-    }
+    
     
     printf("[read] sector = %u\n", sector);
     puts("");
@@ -216,6 +212,12 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     // Meaning less
     else {
         memset(buffer, 0x00, count*FAT_SECTOR_SIZE);
+    }
+    
+    for (i=0; i<512; i++) {
+        if (i != 0 && i % 16 == 0)
+            puts("");
+        printf("%02X ", buffer[i]);
     }
     
     return 1;
@@ -681,3 +683,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
