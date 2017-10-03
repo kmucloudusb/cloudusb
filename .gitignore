@@ -14,3 +14,6 @@ client_secret.json
 
 # Real Files
 **/cloud_usb_test/
+
+# Temp Files
+myfifo
