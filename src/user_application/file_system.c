@@ -238,7 +238,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     printf("[wrtie] sector = %u\n\n", sector);
     
     // Reserved Area
-    if (sector == FAT_RESERVED_AREA_POSITION+1 || sector == FAT_FAT_AREA_BACKUP_POSITION+1) {
+    if (sector == FAT_RESERVED_AREA_POSITION+1 || sector == FAT_RESERVED_AREA_BACKUP_POSITION+1) {
         memcpy(reserved_area, buffer, count * FAT_SECTOR_SIZE);
     }
     
@@ -676,3 +676,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
