@@ -36,7 +36,7 @@ SCOPES = 'https://www.googleapis.com/auth/drive' # all permision
 
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Drive API Python Quickstart'
-FOLDER = "application/vnd.google-apps.folder"  # 구글 드라이브 API에선 타입이 이 스트링인 파일을 폴더로 인식함
+FOLDER_TYPE = "application/vnd.google-apps.folder"  # 구글 드라이브 API에선 타입이 이 스트링인 파일을 폴더로 인식함
 ROOT_FOLDER = "cloud_usb_test"  # 테스트를 위한 최상위 폴더
 
 
@@ -71,7 +71,7 @@ def main():
 
 def file_delete(service, file_id):
     file = service.files().delete(fileId=file_id).execute()
-    print('File Delete: %s' % file_id)
+    print('File Delete Success: %s' % file_id)
 
 if __name__ == '__main__':
     main()
