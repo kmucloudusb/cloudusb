@@ -230,8 +230,8 @@ int check_blank_buffer(unsigned char *buffer, unsigned int size)
 
 int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
-    if (check_blank_buffer(buffer, count*FAT_SECTOR_SIZE)) {
-        puts("[write] skip blank buffer\n");
+    if (sector == 0 || check_blank_buffer(buffer, count*FAT_SECTOR_SIZE)) {
+        puts("[write] skip blank buffer || sector = 0\n");
         return 0;
     }
     
@@ -676,3 +676,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
