@@ -36,8 +36,11 @@ SCOPES = 'https://www.googleapis.com/auth/drive' # all permision
 
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Drive API Python Quickstart'
-FOLDER = "application/vnd.google-apps.folder"  # 구글 드라이브 API에선 타입이 이 스트링인 파일을 폴더로 인식함
+FOLDER_TYPE = "application/vnd.google-apps.folder"  # 구글 드라이브 API에선 타입이 이 스트링인 파일을 폴더로 인식함
 ROOT_FOLDER = "cloud_usb_test"  # 테스트를 위한 최상위 폴더
+MAX_PAGE_SIZE = 1000
+FOLDER_NUMBER = "1"
+FILE_NUMBER = "0"
 
 #구글 계정 권한에 대한 API
 # quickstart.json -> .credentials 
@@ -75,7 +78,7 @@ def main():
     #   https://developers.google.com/drive/v3/web/search-parameters
     #
 
-    ## 1. 구글 드라이브 계정 내의 모든 파일, 디렉토리 정보를 다 가져옴
+    ## 1. 구글 드라이브 계정 내의 모든 파일, 디렉토리 정보를 다 가져옴(휴지통에 있는 파일 제외)
     all_files = []
     retrieve_all_files(service, all_files)
 
@@ -96,21 +99,23 @@ def main():
             bridge.write(file + "\n")
     finally:
         bridge.close()
+
+    print("Metadata Listing Success: ../myfifo")
         
-def listing_files(folderID, directory, result_files, all_files):
+def listing_files(folder_id, directory, result_files, all_files):
 
     if not all_files:
         return        
 
     for item in all_files:
-        if(('parents' in item) and (item['parents'][0]==folderID)):
+        if(('parents' in item) and (item['parents'][0]==folder_id)):
             item['name'] = item['name'].replace(" ", "_")
 
-            if item['mimeType'] == FOLDER:
-                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], "1", item['id'], "1"))
+            if item['mimeType'] == FOLDER_TYPE:
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], FOLDER_NUMBER, item['id'], FOLDER_NUMBER))
                 listing_files(item['id'], directory + "/%s" % item['name'], result_files, all_files)
             else:
-                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], item['size'] ,item['id'], '0'))
+                result_files.append('%s %s %s %s' % (directory + '/' + item['name'], item['size'] ,item['id'], FILE_NUMBER))
 
 
 def find_name_by_id(all_files, id):
@@ -126,28 +131,25 @@ def find_id_by_name(all_files, name):
     return False
 
 def retrieve_all_files(service, all_files):
-    pageToken = None
+    page_token = None
     i = 0
     while True:
-        results = service.files().list(pageToken=pageToken,
-            pageSize=1000,fields="nextPageToken, files(id, name, size, mimeType, parents)").execute()
-
+        results = service.files().list(pageToken=page_token,
+            pageSize=MAX_PAGE_SIZE, 
+            q="trashed = false",
+            fields="nextPageToken, files(id, name, size, mimeType, parents)").execute()
 
         items = results.get('files', [])
         if not items:
             print('No files found.')
         else:
-            print('Files:')
             for item in items:
                 all_files.append(item)
-                #print('{0} ({1})'.format(item['name'], item['id']))
         if(not results.get('nextPageToken')):
             break
       
-        pageToken = results['nextPageToken']
+        page_token = results['nextPageToken']
         i = i+1
-        
-    print(i) 
 
 if __name__ == '__main__':
     main()

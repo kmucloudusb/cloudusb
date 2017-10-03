@@ -37,7 +37,7 @@ SCOPES = 'https://www.googleapis.com/auth/drive.readonly'
 
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Drive API Python Quickstart'
-FOLDER = "application/vnd.google-apps.folder"  # 구글 드라이브 API에선 타입이 이 스트링인 파일을 폴더로 인식함
+FOLDER_TYPE = "application/vnd.google-apps.folder"  # 구글 드라이브 API에선 타입이 이 스트링인 파일을 폴더로 인식함
 ROOT_FOLDER = "cloud_usb_test"  # 테스트를 위한 최상위 폴더
 
 
@@ -69,30 +69,31 @@ def main():
     service = discovery.build('drive', 'v3', http=http)
 
     ## 파일 다운로드
-
-    # 디버그용 
-    #file_id = "0B8CPvjgKUMvtYklyZU1yMGJrbms"
     drive_file = service.files().get(fileId=file_id, fields='size').execute()
     byte_begin = 0
     byte_end = int(drive_file.get('size'))  
 
-    file_path = './'
+    directory = './'
 
-    partial_download(service, file_id, byte_begin, byte_end, file_path)
+    partial_download(service, file_id, byte_begin, byte_end, directory)
 
 
-def partial_download(service, file_id, byte_begin, byte_end, file_path):
+def partial_download(service, file_id, byte_begin, byte_end, directory):
+    # Metadata
     drive_file = service.files().get(fileId=file_id, fields='size, id, name').execute()
 
+    # File URL
     download_url = service.files().get_media(fileId=file_id).uri
-    # print("download_url:"+ download_url)
+    
     total_size = int(drive_file.get('size'))
-    uploadedFileName = drive_file.get('name')
-    filename = file_path + file_id
+    file_name = drive_file.get('name')
+
+    # 파일 이름을 file_name으로 함 
+    file_path = directory + file_id
 
     # print("file_path:"+ file_path)
     if download_url:
-        with open(filename, 'wb') as file:
+        with open(file_path, 'wb') as file:
             print("downloaded: ")
             headers = {"Range": 'bytes=%s-%s' % (byte_begin, byte_end)}
             resp, content = service._http.request(download_url, headers=headers)
@@ -102,8 +103,8 @@ def partial_download(service, file_id, byte_begin, byte_end, file_path):
             else:
                 print('An error occurred: %s' % resp)
                 return None
-            print(uploadedFileName + " - offset: (" + str(byte_begin) + ", " + str(byte_end) + "), size: " +str(byte_end - byte_begin) + " [Success!]")
-        return filename
+            print(file_name + " - offset: (" + str(byte_begin) + ", " + str(byte_end) + "), size: " +str(byte_end - byte_begin) + " [Success]")
+        return file_path
     else:
         return None
 
