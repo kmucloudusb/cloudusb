@@ -3,7 +3,7 @@
 ## 기능 1
 와이파이 변경 및 상태 확인
 
-![APP_WIFI](./images/app_wifi.jpeg)
+<img src="./images/app_wifi.jpeg" alt="APP_WIFI" width="250">
 
 ### 실행흐름
 
