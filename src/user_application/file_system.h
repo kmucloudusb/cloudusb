@@ -45,8 +45,10 @@
 #define FAT_END_OF_CLUSTER_CHAIN_MARKER 0xF0FFFF0F
 #define FAT_CLUSTER_CHAIN_MARKER_LEN 4
 
-
+#define ENTRY_EMPTY 0x00
+#define ENTRY_LFN 0x0F
 #define ENTRY_DIR 0x10
+#define ENTRY_HIDDEN 0x12
 #define ENTRY_FILE 0x20
 
 #define ENTRY_FILENAME_BLANK 0x20
@@ -122,3 +124,4 @@ void create_fat_area();
 void create_reserved_area();
 
 #endif //FILE_SYSTEM_H
+
