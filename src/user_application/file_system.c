@@ -176,7 +176,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
     int i;
     
-    printf("[read] sector = %u\n", sector);
+    printf("[read] sector = %u [%d]\n", sector, (sector-FAT_ROOT_DIR_POSISTION) % FAT_SECTOR_PER_CLUSTER);
     puts("");
     
     // Reserved Area
@@ -652,4 +652,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
