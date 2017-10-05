@@ -23,7 +23,7 @@
 
 #define FAT_FAT_AREA_POSITION 2
 
-#define FAT_ROOT_DIR_POSISTION 2049
+#define FAT_ROOT_DIR_POSISTION 2048
 
 #define FAT_SECTOR_PER_CLUSTER 8
 
@@ -32,7 +32,6 @@
 #define FAT_SECTOR_SIZE 512
 #define FAT_CLUSTER_SIZE 4096
 #define FAT_DIR_ENTRY_SIZE 32
-#define FAT_SHORT_FILE_NAME_LENGTH_FULL 11
 
 #define FAT_SFN_SIZE_FULL 11
 #define FAT_SFN_SIZE_PARTIAL 8
@@ -123,3 +122,4 @@ void create_fat_area();
 void create_reserved_area();
 
 #endif //FILE_SYSTEM_H
+
