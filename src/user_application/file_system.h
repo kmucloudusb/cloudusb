@@ -23,7 +23,7 @@
 
 #define FAT_FAT_AREA_POSITION 2
 
-#define FAT_ROOT_DIR_POSISTION 2048
+#define FAT_ROOT_DIR_POSISTION 2049
 
 #define FAT_SECTOR_PER_CLUSTER 8
 
@@ -122,4 +122,3 @@ void create_fat_area();
 void create_reserved_area();
 
 #endif //FILE_SYSTEM_H
-
