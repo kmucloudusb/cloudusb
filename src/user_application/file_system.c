@@ -178,7 +178,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     puts("");
     
     // Reserved Area
-    if (FAT_RESERVED_AREA_POSITION == sector && sector == FAT_RESERVED_AREA_BACKUP_POSITION) {
+    if (FAT_RESERVED_AREA_POSITION == sector || sector == FAT_RESERVED_AREA_BACKUP_POSITION) {
         memcpy(buffer,
                reserved_area + sector % FAT_RESERVED_AREA_BACKUP_POSITION * FAT_SECTOR_SIZE,
                FAT_CLUSTER_SIZE);
@@ -650,3 +650,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
