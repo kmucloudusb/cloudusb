@@ -87,7 +87,7 @@ void upload_file(char *filename)
 int write_file(char *filename, unsigned char *buffer, int cluster_no)
 {
     int i;
-    printf("[write pysically] %s\n", filename);
+    printf("[write pysically] name = <%s>, len = <%ld>\n", filename, strlen(filename));
     for (i=0; i<16; i++)
         printf("0x%02X, ", buffer[i]);
     puts("");
@@ -652,3 +652,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
