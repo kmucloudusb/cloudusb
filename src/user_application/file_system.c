@@ -100,6 +100,8 @@ int write_file(char *filename, unsigned char *buffer, int cluster_no)
     if (errno == EEXIST)
         fd = open(filename, O_RDWR);
     
+    errno = 0;
+    
     if (fd >= 0) {
         lseek(fd, cluster_no * FAT_CLUSTER_SIZE, SEEK_SET);
         write(fd, buffer + cluster_no * FAT_CLUSTER_SIZE, FAT_CLUSTER_SIZE);
@@ -650,4 +652,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
