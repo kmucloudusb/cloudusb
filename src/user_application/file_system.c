@@ -57,7 +57,7 @@ void record_entry_info(unsigned char *entry)
     for (i=0; i<FAT_CLUSTER_SIZE; i+=FAT_DIR_ENTRY_SIZE) {
         item = (struct fat_dir_entry*) (entry + i);
         
-        if (item->attr != ENTRY_EMPTY && item->attr == ENTRY_LFN) {
+        if (item->attr != ENTRY_EMPTY && item->attr != ENTRY_LFN) {
             unsigned int cluster = get_cluster_from_entry(item);
             
             if (cluster_info[cluster].dirty) {
@@ -652,3 +652,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
