@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -W
-TARGET = bluetoothEcho
+TARGET = bluetoothEcho.out
 LLIB = -lbluetooth
 
 $(TARGET) : bluetoothEcho.o
