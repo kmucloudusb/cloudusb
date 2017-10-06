@@ -7,7 +7,7 @@
 #include <bluetooth/sdp_lib.h>
 #include <bluetooth/rfcomm.h>
 
-enum B_MESSAGE_ID = { 
+enum B_MESSAGE_ID { 
     MESG_NONE, MESG_ERROR,
     REQU_WIFI_INFO, RESP_WIFI_INFO,
     REQU_SET_WIFI, RESP_SET_WIFI,
@@ -16,7 +16,7 @@ enum B_MESSAGE_ID = {
     REQU_SET_DRIVE_AUTH, RESP_SET_DRIVE_AUTH
 };
 
-enum RESPONSE_STATE ={
+enum RESPONSE_STATE {
     RESULT_OK,
     RESULT_FAIL,
     RESULT_ERROR
@@ -26,7 +26,7 @@ typedef struct {
     int id;
     int state;
     char param1[1024];
-    char param1[1024];
+    char param2[1024];
 }BMessage;
 
 int _str2uuid( const char *uuid_str, uuid_t *uuid ) {
@@ -215,21 +215,22 @@ int init_server() {
 }
 void parse_bmsg(char *str, BMessage *input_message){
 	char *temp;
-    char op_temp[1024] = { 0 };
+	char arr_temp[1024] = { 0 };
 
-    // 1. op
+    // 1. id 
 	temp = strtok(str, "$\0\n");
-	strcpy(op_temp, temp);
-    input_message -> op = atoi(op_temp)
+	strcpy(arr_temp, temp);
+    input_message -> id = atoi(arr_temp);
 	
     // 2. state
 	temp = strtok(NULL, "$\0\n");
-	strcpy(input_message -> state, temp);
+	strcpy(arr_temp, temp);
+    	input_message -> state = atoi(arr_temp);
+	
 
     // 3. param1
 	temp = strtok(NULL, "$\0\n");
 	strcpy(input_message -> param1, temp);
-
     // 4. param2
     temp = strtok(NULL, "$\0\n");
     strcpy(input_message -> param2, temp);
@@ -270,6 +271,7 @@ int set_wifi(char *ssid, char *pw){
 int get_wifi_ssid(char *ssid){
     FILE *cmd_fp;
     char cmd_return[1024] = {0};
+    int len;
 
     cmd_fp = popen("iwgetid -r", "r");
     if(cmd_fp == NULL){
@@ -278,6 +280,9 @@ int get_wifi_ssid(char *ssid){
     }
     fgets(cmd_return, 1024, cmd_fp);
     strcpy(ssid, cmd_return);
+    len = (int)strlen(ssid);
+    ssid[len-1] = '\0';
+
     pclose(cmd_fp);
 
     return 0;
@@ -289,7 +294,6 @@ int request_set_wifi(BMessage *request, BMessage *response){
     int ret;
     strcpy(ssid, request->param1);
     strcpy(pw, request->param2);
-
 	ret = set_wifi(ssid, pw);
     if(ret < 0){
         response->state = RESULT_ERROR;
@@ -308,10 +312,9 @@ int request_set_wifi(BMessage *request, BMessage *response){
         response->state = RESULT_FAIL;
 		return -1;
 	}
-	printf("\nwifi Setting Success\nSSID: %s\n", cmd_return);
+	printf("\nwifi Setting Success\nSSID: %s\n", ssid);
     response->state = RESULT_OK;
-    strcpy(response->param1, ssid);
-
+    strcpy(response->param1, ssid);	
 	return 0;
 }
 
@@ -322,9 +325,9 @@ int operate_message(char *command, char *response){
     BMessage requ_message;
     BMessage resp_message = {MESG_NONE, RESULT_OK, "\0", "\0"};
 
+    printf("received [%s]\n", command);
     parse_bmsg(command, &requ_message);
 
-    printf("received [%s]\n", command);
     printf("id : [%d]\n", requ_message.id);
     printf("param1 : [%s]\n", requ_message.param1);
     printf("param2 : [%s]\n", requ_message.param2);
@@ -348,7 +351,6 @@ int operate_message(char *command, char *response){
     }
 
     sprintf(response, "%d$%d$%s$%s\n", resp_message.id, resp_message.state, resp_message.param1, resp_message.param2);
-
     return 0;
 }
 
