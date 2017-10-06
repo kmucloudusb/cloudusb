@@ -298,6 +298,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             cluster_info[cluster].dirty = 1;
             
             printf("((cluster %d is dirty))\n", cluster);
+            clean_entries();
             
             offset += FAT_CLUSTER_SIZE;
             count -= FAT_SECTOR_PER_CLUSTER;
@@ -689,4 +690,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
