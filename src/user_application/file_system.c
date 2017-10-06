@@ -48,6 +48,8 @@ void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
 
 unsigned int get_cluster_from_entry(struct fat_dir_entry *entry)
 {
+    printf("[get_cluster_from_entry] %X high, %X low", entry->first_cluster_low, entry->first_cluster_high);
+    
     return ( (((unsigned int) entry->first_cluster_high) << 16) | entry->first_cluster_low );
 }
 
@@ -80,6 +82,8 @@ void record_entry_info(unsigned char *entry)
             if (cluster_info[cluster].dirty) {
                 upload_file(cluster_info[cluster].filename);
                 cluster_info[cluster].dirty = 0;
+                
+                printf("<<<Cluster %d is dirty...>>>\n", cluster);
             }
             else {
                 printf("<<<Cluster %d is clean...>>>\n", cluster);
@@ -693,4 +697,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
