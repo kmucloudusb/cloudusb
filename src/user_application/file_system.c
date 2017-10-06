@@ -352,6 +352,8 @@ void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
         
         filename[fn_no++] = entry->name[i];
     }
+    
+    filename[fn_no] = NULL;
 }
 
 int fatfs_total_path_levels(char *path)
