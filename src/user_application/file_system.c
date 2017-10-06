@@ -57,17 +57,25 @@ void record_entry_info(unsigned char *entry)
     for (i=0; i<FAT_CLUSTER_SIZE; i+=FAT_DIR_ENTRY_SIZE) {
         item = (struct fat_dir_entry*) (entry + i);
         
-        if (item->attr != ENTRY_EMPTY && item->attr != ENTRY_LFN) {
+        if (item->attr == ENTRY_FILE) {
             unsigned int cluster = get_cluster_from_entry(item);
             
-            if (cluster_info[cluster].dirty) {
-                get_filename_from_entry(item, cluster_info[cluster].filename);
-                
-                if (item->attr == ENTRY_DIR)
-                    cluster_info[cluster].attr = ATTR_DIR;
-                else
-                    cluster_info[cluster].attr = ATTR_FILE;
-            }
+            cluster_info[cluster].attr = ATTR_FILE;
+            get_filename_from_entry(item, cluster_info[cluster].filename);
+            write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
+            upload_file(cluster_info[cluster].filename);
+            
+            //            if (cluster_info[cluster].dirty) {
+            //                get_filename_from_entry(item, cluster_info[cluster].filename);
+            //
+            //                if (item->attr == ENTRY_DIR)
+            //                    cluster_info[cluster].attr = ATTR_DIR;
+            //                else
+            //                    cluster_info[cluster].attr = ATTR_FILE;
+            //            }
+        }
+        else if (item->attr == ENTRY_DIR) {
+            
         }
     }
 }
@@ -216,7 +224,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             
             
             //        clean_fat_area();
-            //        clean_entries();
+            clean_entries();
             
             //        if (cluster_info[cluster].attr == ATTR_DIR)
             //            memcpy(buffer, cluster_info[cluster].buffer, count*FAT_SECTOR_SIZE);
@@ -675,3 +683,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
