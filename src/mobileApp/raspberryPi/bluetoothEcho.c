@@ -1,10 +1,33 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/sdp.h>
 #include <bluetooth/sdp_lib.h>
 #include <bluetooth/rfcomm.h>
+
+enum B_MESSAGE_ID = { 
+    MESG_NONE, MESG_ERROR,
+    REQU_WIFI_INFO, RESP_WIFI_INFO,
+    REQU_SET_WIFI, RESP_SET_WIFI,
+    REQU_SET_CLIENT_SECRET, RESP_SET_CLIENT_SECRET,
+    REQU_ADD_DRIVE_AUTH, RESP_ADD_DRIVE_AUTH,
+    REQU_SET_DRIVE_AUTH, RESP_SET_DRIVE_AUTH
+};
+
+enum RESPONSE_STATE ={
+    RESULT_OK,
+    RESULT_FAIL,
+    RESULT_ERROR
+};
+
+typedef struct {
+    int id;
+    int state;
+    char param1[1024];
+    char param1[1024];
+}BMessage;
 
 int _str2uuid( const char *uuid_str, uuid_t *uuid ) {
     /* This is from the pybluez stack */
@@ -190,63 +213,143 @@ int init_server() {
 
     return client;
 }
-void parse_bmsg(char *str, char *op, char *param1, char *param2){
-	int istr=0;
-	int itemp=0;
-	int num_key = 3; // op, pa1, pa2;
+void parse_bmsg(char *str, BMessage *input_message){
 	char *temp;
+    char op_temp[1024] = { 0 };
 
+    // 1. op
 	temp = strtok(str, "$\0\n");
-	strcpy(op, temp);
+	strcpy(op_temp, temp);
+    input_message -> op = atoi(op_temp)
 	
+    // 2. state
 	temp = strtok(NULL, "$\0\n");
-	strcpy(param1, temp);
+	strcpy(input_message -> state, temp);
 
+    // 3. param1
 	temp = strtok(NULL, "$\0\n");
-	strcpy(param2, temp);
+	strcpy(input_message -> param1, temp);
+
+    // 4. param2
+    temp = strtok(NULL, "$\0\n");
+    strcpy(input_message -> param2, temp);
 }
 
-int set_wifi_ssid(char *ssid, char *pw){
-    	FILE *wpa_fp; 
-	FILE *cmd_fp;
-	char wifi_info[1024] = {0};
-	char cmd_return[1024] = {0};
+int set_wifi(char *ssid, char *pw){
+    FILE *wpa_fp; 
+    char wifi_info[1024] = {0};
+    int ret;
 
-	system("sudo cp /etc/wpa_supplicant/wpa_supplicant.empty /etc/wpa_supplicant/wpa_supplicant.conf");
+    system("sudo cp /etc/wpa_supplicant/wpa_supplicant.empty /etc/wpa_supplicant/wpa_supplicant.conf");
         wpa_fp = fopen("/etc/wpa_supplicant/wpa_supplicant.conf","a");
-	if(wpa_fp){
-		printf("wpa file open: success\n");
-	}
-	else{
-		printf("wpa file open: fail\n");
-		return -1; 
-	}
+    if(wpa_fp){
+        printf("wpa file open: success\n");
+    }
+    else{
+        printf("wpa file open: fail\n");
+        return -1; 
+    }
 
-        sprintf(wifi_info, "network={\n\
-	ssid=\"%s\"\n\
-	psk=\"%s\"\n\
-	key_mgmt=WPA-PSK\n\
+    sprintf(wifi_info, "network={\n\
+    ssid=\"%s\"\n\
+    psk=\"%s\"\n\
+    key_mgmt=WPA-PSK\n\
 }",\
-			ssid, pw);
-	fprintf(wpa_fp, "%s",wifi_info);
-	printf("%s", wifi_info);
+            ssid, pw);
+    fprintf(wpa_fp, "%s",wifi_info);
+    printf("%s", wifi_info);
 
-	fclose(wpa_fp);
-	system("sudo ifdown wlan0");
-	system("sudo ifup wlan0");
-	
-	cmd_fp = popen("iwgetid -r", "r");
-	if(cmd_fp == NULL){
-		perror("cmd_fp: popen() Fail");
-		return -1;
-	}
-	fgets(cmd_return, 1024, cmd_fp);
-	if(strlen(cmd_return) == 0){
+    fclose(wpa_fp);
+    system("sudo ifdown wlan0");
+    system("sudo ifup wlan0");
+
+    return 0;
+}
+
+
+int get_wifi_ssid(char *ssid){
+    FILE *cmd_fp;
+    char cmd_return[1024] = {0};
+
+    cmd_fp = popen("iwgetid -r", "r");
+    if(cmd_fp == NULL){
+        perror("cmd_fp: popen() Fail");
+        return -1;
+    }
+    fgets(cmd_return, 1024, cmd_fp);
+    strcpy(ssid, cmd_return);
+    pclose(cmd_fp);
+
+    return 0;
+}
+
+int request_set_wifi(BMessage *request, BMessage *response){
+    char ssid[1024] = { 0 };
+    char pw[1024] = { 0 };
+    int ret;
+    strcpy(ssid, request->param1);
+    strcpy(pw, request->param2);
+
+	ret = set_wifi(ssid, pw);
+    if(ret < 0){
+        response->state = RESULT_ERROR;
+        return -1;
+    }
+
+	ret = get_wifi_ssid(ssid);
+
+    response->id = RESP_SET_WIFI;
+    if(ret < 0){
+        response->state = RESULT_ERROR;
+        return -1;
+    }
+	else if(strlen(ssid) == 0){
 		printf("\nwifi Setting Fail");
+        response->state = RESULT_FAIL;
 		return -1;
 	}
 	printf("\nwifi Setting Success\nSSID: %s\n", cmd_return);
-	return 1;
+    response->state = RESULT_OK;
+    strcpy(response->param1, ssid);
+
+	return 0;
+}
+
+
+int operate_message(char *command, char *response){
+    int ret = 0;
+
+    BMessage requ_message;
+    BMessage resp_message = {MESG_NONE, RESULT_OK, "\0", "\0"};
+
+    parse_bmsg(command, &requ_message);
+
+    printf("received [%s]\n", command);
+    printf("id : [%d]\n", requ_message.id);
+    printf("param1 : [%s]\n", requ_message.param1);
+    printf("param2 : [%s]\n", requ_message.param2);
+
+    switch(requ_message.id){
+        case REQU_WIFI_INFO:
+            break;
+
+        case REQU_SET_WIFI:
+            ret = request_set_wifi(&requ_message, &resp_message);
+            break;
+
+        case REQU_SET_CLIENT_SECRET:
+            break;
+
+        case REQU_ADD_DRIVE_AUTH:
+            break;
+
+        case REQU_SET_DRIVE_AUTH:
+            break;
+    }
+
+    sprintf(response, "%d$%d$%s$%s\n", resp_message.id, resp_message.state, resp_message.param1, resp_message.param2);
+
+    return 0;
 }
 
 char input[1024] = { 0 };
@@ -254,32 +357,19 @@ char *read_server(int client) {
     // read data from the client
     int bytes_read;
     char localInput[1024] = { 0 };
-    char op[1024] = { 0 };
-    char param1[1024] = { 0 };
-    char param2[1024] = { 0 };
+    char response[1024] = { 0 };
 
     bytes_read = read(client, localInput, sizeof(input));
     strcpy(input, localInput);
 
-    parse_bmsg(localInput, op, param1, param2);
-    //localInput[bytes_read-2] = '\0'; // Last letter is '\n' before '\0'
     if (bytes_read > 0) {
-	int ret = 0;
-        printf("received [%s] %d\n", input, bytes_read);
-	printf("op : %s\n", op);
-	printf("param1 : %s\n", param1);
-	printf("param2 : %s\n", param2);
-
-	ret = set_wifi_ssid(param1, param2);
-	if(ret > 0){
-		sprintf(input, "5$True$%s\n", param1);
-	}
-	else{
-		sprintf(input, "5&False$NULL\n");
-	}
+    	int ret = 0;
+        operate_message(input, response);
+        strcpy(input, response);
 
         return input;
-    } else {
+    } 
+    else {
         return NULL;
     }
 }
@@ -294,9 +384,6 @@ void write_server(int client, char *message) {
     int messageLen;
     strcpy(messageArr, message);
     messageLen = (int)strlen(messageArr);
-    //messageArr[messageLen] = '\n';
-    //messageArr[messageLen+1] = '\0';
-
 
     bytes_sent = write(client, messageArr, strlen(messageArr));
     if (bytes_sent > 0) {
