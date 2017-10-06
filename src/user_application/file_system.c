@@ -9,7 +9,7 @@ static char *path_downloader = "/home/pi/cloudusb/src/googledrive/download/downl
 static char *path_uploader = "/home/pi/cloudusb/src/googledrive/upload/upload.py";
 static char *path_pipe = "/home/pi/cloudusb/bin/myfifo";
 
-static unsigned char reserved_area[FAT_CLUSTER_SIZE+FAT_SECTOR_SIZE];
+static unsigned char reserved_area[FAT_SECTOR_SIZE];
 static unsigned char fat_area[FAT_FAT_AREA_FULL];
 
 static struct cluster_info cluster_info[CLUSTER_INFO_FULL];
@@ -43,12 +43,12 @@ void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
         filename[fn_no++] = entry->name[i];
     }
     
-    filename[fn_no] = NULL;
+    filename[fn_no] = 0;
 }
 
 unsigned int get_cluster_from_entry(struct fat_dir_entry *entry)
 {
-    printf("[get_cluster_from_entry] %X high, %X low", entry->first_cluster_low, entry->first_cluster_high);
+    printf("[get_cluster_from_entry] %X high, %X low\n", entry->first_cluster_low, entry->first_cluster_high);
     
     return ( (((unsigned int) entry->first_cluster_high) << 16) | entry->first_cluster_low );
 }
@@ -56,26 +56,26 @@ unsigned int get_cluster_from_entry(struct fat_dir_entry *entry)
 void record_entry_info(unsigned char *entry)
 {
     int i;
-    struct fat_dir_entry *item = NULL;
+    char filename[FILE_NAME_FULL];
+    struct fat_dir_entry *item;
     
     for (i=0; i<FAT_CLUSTER_SIZE; i+=FAT_DIR_ENTRY_SIZE) {
         item = (struct fat_dir_entry*) (entry + i);
         
+        unsigned int cluster = get_cluster_from_entry(item);
+        
         if (item->attr == ENTRY_FILE) {
-            unsigned int cluster = get_cluster_from_entry(item);
+            if (item->name[0] == ENTRY_REMOVED) {
+                delete_file("");
+                cluster_info[cluster].dirty = 0;
+                
+                continue;
+            }
             
-            char filename[FILE_NAME_FULL];
             strcpy(filename, cluster_info[cluster].filename);
             
             cluster_info[cluster].attr = ATTR_FILE;
             get_filename_from_entry(item, cluster_info[cluster].filename);
-            
-            if (cluster_info[cluster].filename[0] == 0xE5) {
-                // Delete function
-                
-                cluster_info[cluster].dirty = 0;
-                continue;
-            }
             
             write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
             
@@ -90,9 +90,13 @@ void record_entry_info(unsigned char *entry)
             }
         }
         else if (item->attr == ENTRY_DIR) {
-            
+            cluster_info[cluster].attr = ATTR_DIR;
         }
     }
+}
+
+void delete_file(char *fid) {
+    
 }
 
 void upload_file(char *filename)
@@ -162,22 +166,8 @@ void clean_entries()
     puts("[clean dirty cluster]");
     
     for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER; i<CLUSTER_INFO_FULL; i++) {
-        if (cluster_info[i].attr == ATTR_DIR) {
+        if (cluster_info[i].attr == ATTR_DIR)
             record_entry_info(cluster_info[i].buffer);
-        }
-        //        else {
-        //            if (cluster_info[i].dirty) {
-        //                if (write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no) == -1) {
-        //                    perror("Write_file");
-        //
-        //                    return ;
-        //                }
-        //
-        //                upload_file(cluster_info[i].filename);
-        //
-        //                cluster_info[i].dirty = 0;
-        //            }
-        //        }
     }
 }
 
@@ -306,6 +296,8 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             
             memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_CLUSTER_SIZE);
             cluster_info[cluster].dirty = 1;
+            
+            printf("((cluster %d is dirty))\n", cluster);
             
             offset += FAT_CLUSTER_SIZE;
             count -= FAT_SECTOR_PER_CLUSTER;
@@ -641,7 +633,7 @@ void fat_init()
 
 void create_reserved_area()
 {
-    // ~ 1024 Byte
+    // ~ 512 Byte
     unsigned char reserved[] =
     {
         0xEB, 0x58, 0x90, 0x6D, 0x6B, 0x66, 0x73, 0x2E, 0x66, 0x61, 0x74, 0x00, 0x02, 0x08, 0x02, 0x00,
@@ -697,3 +689,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+

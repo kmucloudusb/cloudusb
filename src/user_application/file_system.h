@@ -50,6 +50,7 @@
 #define ENTRY_DIR 0x10
 #define ENTRY_HIDDEN 0x12
 #define ENTRY_FILE 0x20
+#define ENTRY_REMOVED 0xE5
 
 #define ENTRY_FILENAME_BLANK 0x20
 #define ENTRY_NAME_LENGTH 8
@@ -101,6 +102,7 @@ void download_metadata();
 void read_pipe(char *buffer);
 void download_file(char *fid);
 void upload_file(char *filename);
+void delete_file(char *fid);
 
 
 void write_entries();
@@ -124,4 +126,3 @@ void create_fat_area();
 void create_reserved_area();
 
 #endif //FILE_SYSTEM_H
-
