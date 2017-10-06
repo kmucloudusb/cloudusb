@@ -180,7 +180,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     printf("[read] sector = %u [%d] size = %u\n", sector, (sector-FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER, count);
     puts("");
     
-    while (count) {
+    while (count != 0 && count <= 32) {
         // Reserved Area
         if (FAT_RESERVED_AREA_POSITION == sector || sector == FAT_RESERVED_AREA_BACKUP_POSITION) {
             memcpy(buffer + offset,
@@ -265,7 +265,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     printf("[wrtie] sector = %u cluster = %u size = %u\n\n",
            sector, (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER, count);
     
-    while (count) {
+    while (count != 0 && count <= 32) {
         // Fat Area
         if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSISTION) {
             int pos = ((sector - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE);
@@ -675,4 +675,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
