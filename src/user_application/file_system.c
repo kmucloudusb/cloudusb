@@ -60,10 +60,25 @@ void record_entry_info(unsigned char *entry)
         if (item->attr == ENTRY_FILE) {
             unsigned int cluster = get_cluster_from_entry(item);
             
+            char filename[FILE_NAME_FULL];
+            strcpy(filename, cluster_info[cluster].filename);
+            
             cluster_info[cluster].attr = ATTR_FILE;
             get_filename_from_entry(item, cluster_info[cluster].filename);
+            
+            if (cluster_info[cluster].filename[0] == 0xE5) {
+                // Delete function
+                
+                cluster_info[cluster].dirty = 0;
+                return ;
+            }
+            
             write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
-            upload_file(cluster_info[cluster].filename);
+            
+            if (cluster_info[cluster].dirty) {
+                upload_file(cluster_info[cluster].filename);
+                cluster_info[cluster].dirty = 0;
+            }
             
             //            if (cluster_info[cluster].dirty) {
             //                get_filename_from_entry(item, cluster_info[cluster].filename);
@@ -683,4 +698,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
