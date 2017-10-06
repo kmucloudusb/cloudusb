@@ -75,10 +75,10 @@ void record_entry_info(unsigned char *entry)
             
             write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
             
-            if (cluster_info[cluster].dirty) {
-                upload_file(cluster_info[cluster].filename);
-                cluster_info[cluster].dirty = 0;
-            }
+            //            if (cluster_info[cluster].dirty) {
+            upload_file(cluster_info[cluster].filename);
+            cluster_info[cluster].dirty = 0;
+            //            }
             
             //            if (cluster_info[cluster].dirty) {
             //                get_filename_from_entry(item, cluster_info[cluster].filename);
@@ -698,4 +698,3 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
-
