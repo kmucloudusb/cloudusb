@@ -70,7 +70,7 @@ void record_entry_info(unsigned char *entry)
                 // Delete function
                 
                 cluster_info[cluster].dirty = 0;
-                return ;
+                continue;
             }
             
             write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
@@ -165,19 +165,19 @@ void clean_entries()
         if (cluster_info[i].attr == ATTR_DIR) {
             record_entry_info(cluster_info[i].buffer);
         }
-        else {
-            if (cluster_info[i].dirty) {
-                if (write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no) == -1) {
-                    perror("Write_file");
-                    
-                    return ;
-                }
-                
-                upload_file(cluster_info[i].filename);
-                
-                cluster_info[i].dirty = 0;
-            }
-        }
+        //        else {
+        //            if (cluster_info[i].dirty) {
+        //                if (write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no) == -1) {
+        //                    perror("Write_file");
+        //
+        //                    return ;
+        //                }
+        //
+        //                upload_file(cluster_info[i].filename);
+        //
+        //                cluster_info[i].dirty = 0;
+        //            }
+        //        }
     }
 }
 
@@ -698,3 +698,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
