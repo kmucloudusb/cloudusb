@@ -42,6 +42,8 @@ void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
         
         filename[fn_no++] = entry->name[i];
     }
+    
+    filename[fn_no] = NULL;
 }
 
 unsigned int get_cluster_from_entry(struct fat_dir_entry *entry)
@@ -75,19 +77,13 @@ void record_entry_info(unsigned char *entry)
             
             write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
             
-            //            if (cluster_info[cluster].dirty) {
-            upload_file(cluster_info[cluster].filename);
-            cluster_info[cluster].dirty = 0;
-            //            }
-            
-            //            if (cluster_info[cluster].dirty) {
-            //                get_filename_from_entry(item, cluster_info[cluster].filename);
-            //
-            //                if (item->attr == ENTRY_DIR)
-            //                    cluster_info[cluster].attr = ATTR_DIR;
-            //                else
-            //                    cluster_info[cluster].attr = ATTR_FILE;
-            //            }
+            if (cluster_info[cluster].dirty) {
+                upload_file(cluster_info[cluster].filename);
+                cluster_info[cluster].dirty = 0;
+            }
+            else {
+                printf("<<<Cluster %d is clean...>>>\n", cluster);
+            }
         }
         else if (item->attr == ENTRY_DIR) {
             
@@ -504,7 +500,8 @@ int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
     for (i=0;i<len;i++) {
         if ( (filename[i]!=' ') && (filename[i]!='.') ) {
             if (filename[i] >= 'a' && filename[i] <= 'z')
-                sfn_output[pos++] = filename[i] - 'a' + 'A';
+                sfn_output[pos++] = filename[i];
+            //                sfn_output[pos++] = filename[i] - 'a' + 'A';
             else
                 sfn_output[pos++] = filename[i];
         }
@@ -531,7 +528,6 @@ void write_fat_area(int cluster, unsigned int size)
     int cluster_no = 0;
     
     while (1) {
-        cluster_info[cluster].dirty = 0;
         cluster_info[cluster].cluster_no = cluster_no++;
         
         if (size > 4096) {
@@ -598,14 +594,14 @@ void write_entries()
         // Write on allocation table
         write_fat_area(cluster, fsize);
         
-        fatfs_split_path(full_path,path,FILE_NAME_FULL,filename,FILE_NAME_FULL);
+        fatfs_split_path(full_path,path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
         fatfs_lfn_create_sfn(shortfilename, filename);
-        
         memcpy(entry.name, shortfilename, FAT_SFN_SIZE_FULL);
+        
         entry.first_cluster_high = (unsigned short) ((cluster & 0xFFFF0000) >> 16);
         entry.first_cluster_low = (unsigned short) cluster;
         entry.attr = (unsigned char)((dir)? ENTRY_DIR: ENTRY_FILE);
-        entry.size = (dir)? 0: fsize;
+        entry.size = ((dir)? 0: fsize);
         
         insert_dir_entry(cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].buffer, &entry);
         
@@ -614,10 +610,9 @@ void write_entries()
         for (i=cluster; i<(cluster + ((fsize/FAT_CLUSTER_SIZE) + ((fsize%FAT_CLUSTER_SIZE)? 1: 0))); i++) {
             if (dir)
                 cluster_info[i].attr = ATTR_DIR;
-            else {
+            else
                 cluster_info[i].attr = ATTR_FILE;
-                strcpy(cluster_info[i].filename, fid);
-            }
+            strcpy(cluster_info[i].filename, fid);
         }
         
         printf("[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
@@ -698,3 +693,4 @@ void set_root_dir_entry()
 {
     cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
+
