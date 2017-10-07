@@ -57,10 +57,11 @@ void write_entries()
         
         fatfs_split_path(full_path,path,FILE_NAME_FULL,filename,FILE_NAME_FULL);
         fatfs_lfn_create_sfn(shortfilename, filename);
-        
         memcpy(entry.name, shortfilename, FAT_SFN_SIZE_FULL);
+        
         entry.first_cluster_high = (unsigned short) ((cluster & 0xFFFF0000) >> 16);
         entry.first_cluster_low = (unsigned short) cluster;
+        
         entry.attr = (unsigned char)((dir)? ENTRY_DIR: ENTRY_FILE);
         entry.size = (dir)? 0: fsize;
         
@@ -79,7 +80,12 @@ void write_entries()
         
         printf("[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
         
-        cluster += (fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0;
+        insert_dir_entry(cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].buffer, &entry);
+        
+        if (fsize == 0 || dir)
+            cluster ++;
+        else
+            cluster += (fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0);
         
         while((ch = *(filelist+(offset++))) != '\n' && ch != '\0');
     }
