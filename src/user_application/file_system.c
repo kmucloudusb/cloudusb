@@ -29,64 +29,77 @@ void write_entries()
 {
     int i;
     char ch = -1;
+    int fd;
     int offset = 0;
-    char filelist[PIPE_LEN_FULL] = {0};
     
+    char filelist[PIPE_LEN_FULL] = {0};
     char full_path[PIPE_LEN_FULL];
     char path[FILE_NAME_FULL];
     char filename[FILE_NAME_FULL];
     char shortfilename[FAT_SFN_SIZE_FULL];
-    
-    unsigned int fsize;
     char fid[FILE_ID_FULL];
+    
+    struct fat_dir_entry entry = {0};
+    unsigned int fsize;
+    
     int dir;
     int cluster = 3;
     
-    struct fat_dir_entry entry;
-    memset(&entry, 0x00, sizeof(struct fat_dir_entry));
-    
+    // Receive information from Google Drive via pipe
     read_pipe(filelist);
     
     while(ch != '\0' && filelist[offset] != 0)
     {
-        memset(fid, 0x00, FILE_ID_FULL);
         sscanf(filelist+offset, "%512s %u %s %d", full_path, &fsize, fid, &dir);
         
         // Write on allocation table
         write_fat_area(cluster, fsize);
         
-        fatfs_split_path(full_path,path,FILE_NAME_FULL,filename,FILE_NAME_FULL);
+        // Extract short file name for entry
+        fatfs_split_path(full_path, path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
         fatfs_lfn_create_sfn(shortfilename, filename);
         memcpy(entry.name, shortfilename, FAT_SFN_SIZE_FULL);
         
         entry.first_cluster_high = (unsigned short) ((cluster & 0xFFFF0000) >> 16);
         entry.first_cluster_low = (unsigned short) cluster;
         
-        entry.attr = (unsigned char)((dir)? ENTRY_DIR: ENTRY_FILE);
-        entry.size = (dir)? 0: fsize;
-        
-        insert_dir_entry(cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].buffer, &entry);
-        
-        download_file(fid);
-        
-        for (i=cluster; i<(cluster + ((fsize/FAT_CLUSTER_SIZE) + (fsize%FAT_CLUSTER_SIZE)? 1: 0)); i++) {
-            if (dir)
-                cluster_info[i].attr = ATTR_DIR;
-            else {
-                cluster_info[i].attr = ATTR_FILE;
-                memcpy(cluster_info[i].filename, fid, FILE_NAME_FULL);
+        if (dir) {
+            entry.attr = ENTRY_DIR;
+            entry.size = 0;
+            
+            cluster_info[cluster].attr = ATTR_DIR;
+        }
+        else {
+            entry.attr = ENTRY_FILE;
+            entry.size = fsize;
+            
+            download_file(fid);
+            
+            if ( ((fd = open(fid, O_RDONLY)) >= 0) ) {
+                for (i = cluster;
+                     i < (cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0)));
+                     i++)
+                {
+                    cluster_info[i].attr = ATTR_FILE;
+                    read(fd, cluster_info[cluster].buffer, FAT_CLUSTER_SIZE);
+                    strcpy(cluster_info[i].filename, fid);
+                }
+                
+                close(fd);
             }
         }
         
-        printf("[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
-        
         insert_dir_entry(cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].buffer, &entry);
         
+        printf("\n[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
+        
+        // Search next empty cluster
         if (fsize == 0 || dir)
             cluster ++;
         else
             cluster += (fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0);
         
+        // Search next line first character
         while((ch = *(filelist+(offset++))) != '\n' && ch != '\0');
     }
 }
