@@ -7,6 +7,8 @@
 #include <bluetooth/sdp_lib.h>
 #include <bluetooth/rfcomm.h>
 
+#define PARAM_BUF_LEN 1024
+
 enum B_MESSAGE_ID { 
     MESG_NONE, MESG_ERROR,
     REQU_WIFI_INFO, RESP_WIFI_INFO,
@@ -25,8 +27,8 @@ enum RESPONSE_STATE {
 typedef struct {
     int id;
     int state;
-    char param1[1024];
-    char param2[1024];
+    char param1[PARAM_BUF_LEN];
+    char param2[PARAM_BUF_LEN];
 }BMessage;
 
 int _str2uuid( const char *uuid_str, uuid_t *uuid ) {
@@ -215,7 +217,7 @@ int init_server() {
 }
 void parse_bmsg(char *str, BMessage *input_message){
 	char *temp;
-	char arr_temp[1024] = { 0 };
+	char arr_temp[PARAM_BUF_LEN] = { 0 };
 
     // 1. id 
 	temp = strtok(str, "$\0\n");
@@ -238,7 +240,7 @@ void parse_bmsg(char *str, BMessage *input_message){
 
 int set_wifi(char *ssid, char *pw){
     FILE *wpa_fp; 
-    char wifi_info[1024] = {0};
+    char wifi_info[PARAM_BUF_LEN] = {0};
     int ret;
 
     system("sudo cp /etc/wpa_supplicant/wpa_supplicant.empty /etc/wpa_supplicant/wpa_supplicant.conf");
@@ -270,7 +272,7 @@ int set_wifi(char *ssid, char *pw){
 
 int get_wifi_ssid(char *ssid){
     FILE *cmd_fp;
-    char cmd_return[1024] = {0};
+    char cmd_return[PARAM_BUF_LEN] = {0};
     int len;
 
     cmd_fp = popen("iwgetid -r", "r");
@@ -288,10 +290,40 @@ int get_wifi_ssid(char *ssid){
     return 0;
 }
 
-int request_set_wifi(BMessage *request, BMessage *response){
-    char ssid[1024] = { 0 };
-    char pw[1024] = { 0 };
+
+// REQU_WIFI_INFO
+int request_wifi_info(BMessage *request, BMessage *response){
+    char ssid[PARAM_BUF_LEN] = { 0 };
     int ret;
+
+    response->id = RESP_WIFI_INFO;
+    ret = get_wifi_ssid(ssid);
+    
+    if(ret < 0){
+        response->state = RESULT_ERROR;
+        return -1;
+    }
+    else if(strlen(ssid) == 0){
+        printf("\nrequest_wifi_info(): RESULT_FAIL");
+        response->state = RESULT_FAIL;
+        return -1;
+    }
+    printf("\nrequest_wifi_info(): RESULT_OK [%s]\n", ssid);
+    response->state = RESULT_OK;
+    strcpy(response->param1, ssid); 
+    return 0;
+}
+
+
+
+// REQU_SET_WIFI
+int request_set_wifi(BMessage *request, BMessage *response){
+    char ssid[PARAM_BUF_LEN] = { 0 };
+    char pw[PARAM_BUF_LEN] = { 0 };
+    int ret;
+
+    response->id = RESP_SET_WIFI;
+
     strcpy(ssid, request->param1);
     strcpy(pw, request->param2);
 	ret = set_wifi(ssid, pw);
@@ -308,16 +340,105 @@ int request_set_wifi(BMessage *request, BMessage *response){
         return -1;
     }
 	else if(strlen(ssid) == 0){
-		printf("\nwifi Setting Fail");
+		printf("\request_set_wifi(): RESULT_FAIL");
         response->state = RESULT_FAIL;
 		return -1;
 	}
-	printf("\nwifi Setting Success\nSSID: %s\n", ssid);
-    response->state = RESULT_OK;
+	printf("\request_set_wifi(): RESULT_OK [%s]\n", ssid);
+    
     strcpy(response->param1, ssid);	
+    response->state = RESULT_OK;
 	return 0;
 }
 
+int create_client_secret_json(char *client_id, char *client_secret){
+    FILE *json_fp;
+
+    //json_fp = fopen("../../googledrive/list/client_secret.json","w");
+    json_fp = fopen("client_secret.json","w");
+    fprintf(json_fp,"\
+{\"installed\":\n\
+    {\n\
+        \"client_id\":\"%s\",\n\
+        \"project_id\":\"goormUSB\",\n\
+        \"auth_uri\":\"https://accounts.google.com/o/oauth2/auth\",\n\
+        \"token_uri\":\"https://accounts.google.com/o/oauth2/token\",\n\
+        \"auth_provider_x509_cert_url\":\"https://www.googleapis.com/oauth2/v1/certs\",\n\
+        \"client_secret\":\"%s\",\n\
+        \"redirect_uris\":[\"urn:ietf:wg:oauth:2.0:oob\",\"http://localhost\"]\n\
+    }\n\
+}"\
+    , client_id, client_secret);
+
+    fclose(json_fp);
+    return 0;
+}
+
+//REQU_SET_CLIENT_SECRET
+int request_set_client_secret(BMessage *request, BMessage *response){
+    int ret;
+    char client_id[PARAM_BUF_LEN] = {0};
+    char client_secret[PARAM_BUF_LEN] = {0};
+    char verification_url[PARAM_BUF_LEN] = {0};
+
+    response->id = RESP_SET_CLIENT_SECRET;
+
+    strcpy(client_id, request->param1);
+    strcpy(client_secret, request->param2);
+
+    ret = create_client_secret_json(client_id, client_secret);
+    if(ret < 0){
+        response->state = RESULT_ERROR;
+        return -1;
+    }
+    
+    printf("\request_set_client_secret(): RESULT_OK");
+
+    sprintf(verification_url, "https://accounts.google.com/o/oauth2/auth?scope=https%%3A%%2F%%2Fwww.googleapis.com%%2Fauth%%2Fdrive&redirect_uri=urn%%3Aietf%%3Awg%%3Aoauth%%3A2.0%%3Aoob&response_type=code&client_id=%s&access_type=offline", client_id);
+    strcpy(response->param1, verification_url);
+    response->state = RESULT_OK;
+    return 0;
+}
+
+int create_drive_auth_json(char *account_nickname, char *verification_code){
+    FILE *json_fp;
+    char json_path[PARAM_BUF_LEN] = {0};
+
+    // 1. 파이썬 실행
+    // verification_code | python drive_auth.py --noauth_local_webserver
+    // => .credentials/drive-python-quickstart.json 이 만들어짐
+
+    // 2. 계정 추가
+    // /.credentials/drive-python-quickstart.json 을
+    // ./driveAuth/NICKNAME.json 으로 저장
+    fclose(json_fp);
+    return 0;
+}
+
+//REQU_ADD_DRIVE_AUTH
+int request_add_drive_auth(BMessage *request, BMessage *response){
+    int ret;
+    char account_nickname[PARAM_BUF_LEN] = {0};
+    char verification_code[PARAM_BUF_LEN] = {0};
+
+    response->id = RESP_ADD_DRIVE_AUTH;
+
+    strcpy(account_nickname, request->param1);
+    strcpy(verification_code, request->param2);
+
+    ret = create_drive_auth_json(account_nickname, verification_code);
+    if(ret < 0){
+        response->state = RESULT_ERROR;
+        return -1;
+    }
+    
+    printf("\request_set_client_secret(): RESULT_OK");
+
+    sprintf(verfication_url, "https://accounts.google.com/o/oauth2/auth?scope=https%%3A%%2F%%2Fwww.googleapis.com%%2Fauth%%2Fdrive&redirect_uri=urn%%3Aietf%%3Awg%%3Aoauth%%3A2.0%%3Aoob&response_type=code&client_id=%s&access_type=offline", client_id);
+    strcpy(response->param1, verfication_url);
+    response->state = RESULT_OK;
+    return 0;
+}
 
 int operate_message(char *command, char *response){
     int ret = 0;
@@ -334,6 +455,7 @@ int operate_message(char *command, char *response){
 
     switch(requ_message.id){
         case REQU_WIFI_INFO:
+            ret = request_wifi_info(&requ_message, &resp_message);
             break;
 
         case REQU_SET_WIFI:
@@ -341,12 +463,15 @@ int operate_message(char *command, char *response){
             break;
 
         case REQU_SET_CLIENT_SECRET:
+            ret = request_set_client_secret(&requ_message, &resp_message);
             break;
 
         case REQU_ADD_DRIVE_AUTH:
             break;
 
         case REQU_SET_DRIVE_AUTH:
+            // ./driveAuth/NICKNAME.json 을
+            // /.credentials/drive-python-quickstart.json 으로 저장
             break;
     }
 
@@ -354,12 +479,12 @@ int operate_message(char *command, char *response){
     return 0;
 }
 
-char input[1024] = { 0 };
+char input[PARAM_BUF_LEN] = { 0 };
 char *read_server(int client) {
     // read data from the client
     int bytes_read;
-    char localInput[1024] = { 0 };
-    char response[1024] = { 0 };
+    char localInput[PARAM_BUF_LEN] = { 0 };
+    char response[PARAM_BUF_LEN] = { 0 };
 
     bytes_read = read(client, localInput, sizeof(input));
     strcpy(input, localInput);
@@ -381,7 +506,7 @@ char *read_server(int client) {
 
 void write_server(int client, char *message) {
     // send data to the client
-    char messageArr[1024] = { 0 };
+    char messageArr[PARAM_BUF_LEN] = { 0 };
     int bytes_sent;
     int messageLen;
     strcpy(messageArr, message);
