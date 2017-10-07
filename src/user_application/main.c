@@ -6,11 +6,12 @@ int main()
     // Set FAT32 file-system fixed area
     fat_init();
     
-    // Download metadata from google drive
+    // Download metadata from cloud storage
     download_metadata();
     
-    // Make allocation table
-    write_entries();
+    // Synchronize with cloud storage
+    sync_with_cloud();
     
+    // Run kernel module to communicate with OS
     run_module();
 }
