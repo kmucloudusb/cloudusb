@@ -102,10 +102,10 @@ void download_metadata();
 void read_pipe(char *buffer);
 void download_file(char *fid);
 void upload_file(char *filename);
-void delete_file(char *fid);
+void remove_file(char *fid);
 
 
-void write_entries();
+void sync_with_cloud();
 void write_fat_area(int cluster, unsigned int size);
 int insert_dir_entry(unsigned char *rootdir_entry, struct fat_dir_entry *entry);
 void record_entry_info(unsigned char *entry);
@@ -126,3 +126,4 @@ void create_fat_area();
 void create_reserved_area();
 
 #endif //FILE_SYSTEM_H
+
