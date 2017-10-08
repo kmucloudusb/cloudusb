@@ -6,8 +6,10 @@
 #include <bluetooth/sdp.h>
 #include <bluetooth/sdp_lib.h>
 #include <bluetooth/rfcomm.h>
+#include <string.h>
 
 #define PARAM_BUF_LEN 1024
+#define MAX_USER_NUM 10
 
 enum B_MESSAGE_ID { 
     MESG_NONE, MESG_ERROR,
@@ -15,7 +17,8 @@ enum B_MESSAGE_ID {
     REQU_SET_WIFI, RESP_SET_WIFI,
     REQU_SET_CLIENT_SECRET, RESP_SET_CLIENT_SECRET,
     REQU_ADD_DRIVE_AUTH, RESP_ADD_DRIVE_AUTH,
-    REQU_SET_DRIVE_AUTH, RESP_SET_DRIVE_AUTH
+    REQU_CHANGE_DRIVE_AUTH, RESP_CHANGE_DRIVE_AUTH,
+    REQU_GET_USER_LIST, RESP_GET_USER_LIST
 };
 
 enum RESPONSE_STATE {
@@ -30,6 +33,10 @@ typedef struct {
     char param1[PARAM_BUF_LEN];
     char param2[PARAM_BUF_LEN];
 }BMessage;
+
+char user_auth_list[MAX_USER_NUM][PARAM_BUF_LEN];
+int num_user = 0;
+
 
 int _str2uuid( const char *uuid_str, uuid_t *uuid ) {
     /* This is from the pybluez stack */
@@ -215,6 +222,9 @@ int init_server() {
 
     return client;
 }
+
+/* =================================== */
+
 void parse_bmsg(char *str, BMessage *input_message){
 	char *temp;
 	char arr_temp[PARAM_BUF_LEN] = { 0 };
@@ -237,6 +247,7 @@ void parse_bmsg(char *str, BMessage *input_message){
     temp = strtok(NULL, "$\0\n");
     strcpy(input_message -> param2, temp);
 }
+/* =================================== */
 
 int set_wifi(char *ssid, char *pw){
     FILE *wpa_fp; 
@@ -290,7 +301,6 @@ int get_wifi_ssid(char *ssid){
     return 0;
 }
 
-
 // REQU_WIFI_INFO
 int request_wifi_info(BMessage *request, BMessage *response){
     char ssid[PARAM_BUF_LEN] = { 0 };
@@ -313,8 +323,7 @@ int request_wifi_info(BMessage *request, BMessage *response){
     strcpy(response->param1, ssid); 
     return 0;
 }
-
-
+/* =================================== */
 
 // REQU_SET_WIFI
 int request_set_wifi(BMessage *request, BMessage *response){
@@ -350,12 +359,12 @@ int request_set_wifi(BMessage *request, BMessage *response){
     response->state = RESULT_OK;
 	return 0;
 }
-
+/* =================================== */
 int create_client_secret_json(char *client_id, char *client_secret){
     FILE *json_fp;
 
     //json_fp = fopen("../../googledrive/list/client_secret.json","w");
-    json_fp = fopen("client_secret.json","w");
+    csj_fp = fopen("../../googledrive/authority/client_secret.json","w");
     fprintf(json_fp,"\
 {\"installed\":\n\
     {\n\
@@ -374,8 +383,10 @@ int create_client_secret_json(char *client_id, char *client_secret){
     return 0;
 }
 
+
 //REQU_SET_CLIENT_SECRET
 int request_set_client_secret(BMessage *request, BMessage *response){
+    // client_secret.json 생성
     int ret;
     char client_id[PARAM_BUF_LEN] = {0};
     char client_secret[PARAM_BUF_LEN] = {0};
@@ -399,27 +410,102 @@ int request_set_client_secret(BMessage *request, BMessage *response){
     response->state = RESULT_OK;
     return 0;
 }
+/* =================================== */
+// user_auth_list.dat에 유저 리스트 관리
+// 인증파일(json)을 저장해놓은 유저 목록
+int load_user_auth_list(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN]){
+    FILE *fp;
+    int i;
+    
+    fp = fopen("./driveAuth/user_auth_list.dat","r");
+    if(fp == NULL){
+        perror("fopen");
+        return -1;
+    }
+
+    fscanf(fp, "%d\n", num_user);
+    for(i=0; i<*num_user; i++){
+        fscanf(fp ,"%s\n", user_auth_list[i]);
+        printf("init_user_auth_list(): %s\n", user_auth_list[i]);
+    }
+    printf("init_user_auth_list(): USER_NUM = %d\n", *num_user);
+
+    fclose(fp);
+    return 0;
+}
+s
+
+int save_user_auth_list(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN]){
+    FILE *fp;
+    int i;
+
+    fp = fopen("./driveAuth/user_auth_list.dat","w");
+
+    fprintf(fp ,"%d\n", *num_user);
+    for(i=0; i<*num_user; i++){
+        fprintf(fp ,"%s\n", user_auth_list[i]);
+        printf("save_user_auth_list(): %s\n", user_auth_list[i]);
+    }
+    printf("save_user_auth_list(): USER_NUM = %d\n", *num_user);
+    fclose(fp);
+    return 0;
+}
+
+int add_user_auth_list(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN], char *account_nickname){
+    strcpy(user_auth_list[*num_user], account_nickname);
+    (*num_user)++;
+
+    printf("add_user_auth_list(): %s\n", account_nickname);
+    printf("add_user_auth_list(): USER_NUM = %d\n", *num_user);
+
+    // 유저 리스트 파일에 저장(동기화)
+    save_user_auth_list(num_user, user_auth_list);
+    return 0;
+}
+
+
+int users_list_to_str(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN], char *users){
+    // 유저 목록을 스트링으로
+    int i;
+    sprintf(users,"%d",*num_user);
+    strcat(users, "@");
+    for(i=0; i<*num_user; i++){
+        strcat(users, user_auth_list[i]);
+        strcat(users, "@");
+    }
+
+    printf("user_list_to_str(): %s\n",users);
+    return 0;
+}
+
 
 int create_drive_auth_json(char *account_nickname, char *verification_code){
-    FILE *json_fp;
-    char json_path[PARAM_BUF_LEN] = {0};
+    char auth_python_path[PARAM_BUF_LEN] = "../../googledrive/authority/authority.py";
+    char drive_auth_path[PARAM_BUF_LEN] = "./driveAuth/";
+    char sys_command[PARAM_BUF_LEN] = {0};
 
-    // 1. 파이썬 실행
-    // verification_code | python drive_auth.py --noauth_local_webserver
-    // => .credentials/drive-python-quickstart.json 이 만들어짐
+    // 1. 권한 json 생성
+    // strcpy(auth_python_path, "../../googledrive/authority/authority.py")
+    sprintf(sys_command, "echo %s | python %s --noauth_local_webserver",verification_code, auth_python_path);
+    system(sys_command);
 
-    // 2. 계정 추가
-    // /.credentials/drive-python-quickstart.json 을
-    // ./driveAuth/NICKNAME.json 으로 저장
-    fclose(json_fp);
+    // 2. 권한 json 복사
+    sprintf(sys_command, "cp ~/.credentials/drive-python-quickstart.json %s%s_auth.json", drive_auth_path, account_nickname);
+    system(sys_command);
+
+    // 3. 유저를 리스트에 추가
+    add_user_auth_list(&num_user, user_auth_list, account_nickname);
+
     return 0;
 }
 
 //REQU_ADD_DRIVE_AUTH
 int request_add_drive_auth(BMessage *request, BMessage *response){
+    // .credential/drive_auth.json 생성
     int ret;
     char account_nickname[PARAM_BUF_LEN] = {0};
     char verification_code[PARAM_BUF_LEN] = {0};
+    char users[PARAM_BUF_LEN] = {0};
 
     response->id = RESP_ADD_DRIVE_AUTH;
 
@@ -432,14 +518,52 @@ int request_add_drive_auth(BMessage *request, BMessage *response){
         return -1;
     }
     
-    printf("\request_set_client_secret(): RESULT_OK");
+    printf("\request_add_drive_auth(): RESULT_OK");
 
-    sprintf(verfication_url, "https://accounts.google.com/o/oauth2/auth?scope=https%%3A%%2F%%2Fwww.googleapis.com%%2Fauth%%2Fdrive&redirect_uri=urn%%3Aietf%%3Awg%%3Aoauth%%3A2.0%%3Aoob&response_type=code&client_id=%s&access_type=offline", client_id);
-    strcpy(response->param1, verfication_url);
+    users_list_to_str(&num_user, user_auth_list, users);
+
+    strcpy(response->param1, account_nickname);
+    strcpy(response->param2, users);
+
     response->state = RESULT_OK;
     return 0;
 }
+/* =================================== */
 
+int change_drive_auth_json(char *account_nickname){
+    char drive_auth_path[PARAM_BUF_LEN] = "./driveAuth/";
+    char sys_command[PARAM_BUF_LEN] = {0};
+
+    // 구글 API를 위한 drive_auth.json 을 앱에서 요청한 계정으로 바꿈
+    sprintf(sys_command, "cp %s%s_auth.json ~/.credentials/drive-python-quickstart.json", drive_auth_path, account_nickname);
+    system(sys_command);
+    return 0;
+}
+
+
+//REQU_CHANGE_DRIVE_AUTH
+int request_change_drive_auth(BMessage *request, BMessage *response){
+    int ret;
+    char account_nickname[PARAM_BUF_LEN] = {0};
+
+    response->id = RESP_SET_DRIVE_AUTH;
+
+    strcpy(account_nickname, request->param1);
+    ret = change_drive_auth_json(account_nickname)
+    if(ret < 0){
+        response->state = RESULT_ERROR;
+        return -1;
+    }
+    
+    printf("\request_set_drive_auth(): RESULT_OK");
+
+    strcpy(response->param1, account_nickname);
+    response->state = RESULT_OK;
+}
+/* =================================== */
+
+/* =================================== */
+/* =================================== */
 int operate_message(char *command, char *response){
     int ret = 0;
 
@@ -467,11 +591,13 @@ int operate_message(char *command, char *response){
             break;
 
         case REQU_ADD_DRIVE_AUTH:
+            request_add_drive_auth(&requ_message, &resp_message);
             break;
 
-        case REQU_SET_DRIVE_AUTH:
-            // ./driveAuth/NICKNAME.json 을
-            // /.credentials/drive-python-quickstart.json 으로 저장
+        case REQU_CHANGE_DRIVE_AUTH:
+            request_change_drive_auth(&requ_message, &resp_message);
+            break;
+        default:
             break;
     }
 
@@ -501,9 +627,6 @@ char *read_server(int client) {
     }
 }
 
-
-
-
 void write_server(int client, char *message) {
     // send data to the client
     char messageArr[PARAM_BUF_LEN] = { 0 };
@@ -522,6 +645,8 @@ int main()
 {
     int client = init_server();
 
+    // user_auth_list.dat에 있는 유저 목록 초기화
+    load_user_auth_list(&num_user, user_auth_list);
 
     while(1)
     {

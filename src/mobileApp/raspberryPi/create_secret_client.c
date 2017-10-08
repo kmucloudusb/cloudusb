@@ -1,13 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 int create_client_secret_json(char *client_id, char *client_secret){
     FILE *csj_fp;
     char verfication_url[1024] = {0};
 
-    //csj_fp = fopen("../../googledrive/list/client_secret.json","w");
-    csj_fp = fopen("client_secret.json","w");
+    csj_fp = fopen("../../googledrive/authority/client_secret.json","w");
     fprintf(csj_fp,"\
 {\"installed\":\n\
     {\n\
