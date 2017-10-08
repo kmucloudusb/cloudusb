@@ -6,7 +6,7 @@
 
 # Security file #
 # google API secret data #
-client_secret.json
+client_secret.*
 
 # MAC system file
 .DS_Store
