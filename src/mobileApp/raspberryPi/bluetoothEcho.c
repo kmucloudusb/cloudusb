@@ -13,12 +13,13 @@
 
 enum B_MESSAGE_ID { 
     MESG_NONE, MESG_ERROR,
-    REQU_WIFI_INFO, RESP_WIFI_INFO,
+    REQU_GET_WIFI_INFO, RESP_GET_WIFI_INFO,
     REQU_SET_WIFI, RESP_SET_WIFI,
     REQU_SET_CLIENT_SECRET, RESP_SET_CLIENT_SECRET,
+    REQU_GET_USERS_LIST, RESP_GET_USERS_LIST,
     REQU_ADD_DRIVE_AUTH, RESP_ADD_DRIVE_AUTH,
     REQU_CHANGE_DRIVE_AUTH, RESP_CHANGE_DRIVE_AUTH,
-    REQU_GET_USER_LIST, RESP_GET_USER_LIST
+    REQU_DEL_DRIVE_AUTH, RESP_DEL_DRIVE_AUTH
 };
 
 enum RESPONSE_STATE {
@@ -223,6 +224,7 @@ int init_server() {
     return client;
 }
 
+
 /* =================================== */
 
 void parse_bmsg(char *str, BMessage *input_message){
@@ -301,12 +303,12 @@ int get_wifi_ssid(char *ssid){
     return 0;
 }
 
-// REQU_WIFI_INFO
-int request_wifi_info(BMessage *request, BMessage *response){
+// REQU_GET_WIFI_INFO
+int request_get_wifi_info(BMessage *request, BMessage *response){
     char ssid[PARAM_BUF_LEN] = { 0 };
     int ret;
 
-    response->id = RESP_WIFI_INFO;
+    response->id = RESP_GET_WIFI_INFO;
     ret = get_wifi_ssid(ssid);
     
     if(ret < 0){
@@ -314,11 +316,11 @@ int request_wifi_info(BMessage *request, BMessage *response){
         return -1;
     }
     else if(strlen(ssid) == 0){
-        printf("\nrequest_wifi_info(): RESULT_FAIL");
+        printf("\request_get_wifi_info(): RESULT_FAIL");
         response->state = RESULT_FAIL;
         return -1;
     }
-    printf("\nrequest_wifi_info(): RESULT_OK [%s]\n", ssid);
+    printf("\request_get_wifi_info(): RESULT_OK [%s]\n", ssid);
     response->state = RESULT_OK;
     strcpy(response->param1, ssid); 
     return 0;
@@ -433,7 +435,7 @@ int load_user_auth_list(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN]){
     fclose(fp);
     return 0;
 }
-s
+
 
 int save_user_auth_list(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN]){
     FILE *fp;
@@ -451,7 +453,27 @@ int save_user_auth_list(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN]){
     return 0;
 }
 
+int save_user_auth_list_except_index(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN], const int index){
+    FILE *fp;
+    int i;
+
+    fp = fopen("./driveAuth/user_auth_list.dat","w");
+
+    fprintf(fp ,"%d\n", *num_user);
+    for(i=0; i<*num_user; i++){
+        if(i == index)
+            continue;
+        fprintf(fp ,"%s\n", user_auth_list[i]);
+        printf("save_user_auth_list(): %s\n", user_auth_list[i]);
+    }
+    (*num_user)--;
+    printf("save_user_auth_list(): USER_NUM = %d\n", *num_user);
+    fclose(fp);
+    return 0;
+}
+
 int add_user_auth_list(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN], char *account_nickname){
+    load_user_auth_list(num_user, user_auth_list);
     strcpy(user_auth_list[*num_user], account_nickname);
     (*num_user)++;
 
@@ -478,11 +500,12 @@ int users_list_to_str(int *num_user, char (*user_auth_list)[PARAM_BUF_LEN], char
     return 0;
 }
 
-
-int create_drive_auth_json(char *account_nickname, char *verification_code){
+int create_drive_auth_json(char *account_nickname, char *verification_code, char *users){
     char auth_python_path[PARAM_BUF_LEN] = "../../googledrive/authority/authority.py";
     char drive_auth_path[PARAM_BUF_LEN] = "./driveAuth/";
     char sys_command[PARAM_BUF_LEN] = {0};
+    char user_auth_list[MAX_USER_NUM][PARAM_BUF_LEN];
+    int num_user;
 
     // 1. 권한 json 생성
     // strcpy(auth_python_path, "../../googledrive/authority/authority.py")
@@ -496,6 +519,45 @@ int create_drive_auth_json(char *account_nickname, char *verification_code){
     // 3. 유저를 리스트에 추가
     add_user_auth_list(&num_user, user_auth_list, account_nickname);
 
+    // 4. 유저 리스트 스트링에 저장
+    users_list_to_str(&num_user, user_auth_list, users);
+
+    return 0;
+}
+
+int get_auth_users_list(char *users){
+    int ret;
+    char user_auth_list[MAX_USER_NUM][PARAM_BUF_LEN];
+    int num_user;
+
+    ret = load_user_auth_list(&num_user, user_auth_list);
+    if(ret < 0){
+        return -1;
+    }
+    ret = users_list_to_str(&num_user, user_auth_list, users);
+    if(ret < 0){
+        return -1;
+    }
+    return 0;
+}
+
+//REQU_GET_USERS_LIST
+int request_get_users_list(BMessage *request, BMessage *response){
+    // 구글 드라이브 인증 파일이 있는 유저목록 반환
+    int ret;
+    char users[PARAM_BUF_LEN] = {0};
+
+    response->id = RESP_GET_USERS_LIST;
+
+    ret = get_auth_users_list(users);
+    if(ret < 0){
+        response->state = RESULT_ERROR;
+        return -1;
+    }
+    printf("\request_get_users_list(): RESULT_OK");
+    strcpy(response->param1, users);
+
+    response->state = RESULT_OK;
     return 0;
 }
 
@@ -512,15 +574,12 @@ int request_add_drive_auth(BMessage *request, BMessage *response){
     strcpy(account_nickname, request->param1);
     strcpy(verification_code, request->param2);
 
-    ret = create_drive_auth_json(account_nickname, verification_code);
+    ret = create_drive_auth_json(account_nickname, verification_code, users);
     if(ret < 0){
         response->state = RESULT_ERROR;
         return -1;
     }
-    
     printf("\request_add_drive_auth(): RESULT_OK");
-
-    users_list_to_str(&num_user, user_auth_list, users);
 
     strcpy(response->param1, account_nickname);
     strcpy(response->param2, users);
@@ -530,23 +589,44 @@ int request_add_drive_auth(BMessage *request, BMessage *response){
 }
 /* =================================== */
 
+int search_user_in_list(char *key_user ,const int num_user,char (*user_auth_list)[PARAM_BUF_LEN]){
+    int i;
+    for(i=0; i<num_user; i++){
+        if(strcmp(key_user, user_auth_list[i]) == 0){
+            printf("search_user_in_list(): find %s\n", key_user);
+            return i;
+        }
+    }
+    printf("search_user_in_list(): not exist %s\n", key_user);
+    return -1;
+}
+
 int change_drive_auth_json(char *account_nickname){
     char drive_auth_path[PARAM_BUF_LEN] = "./driveAuth/";
     char sys_command[PARAM_BUF_LEN] = {0};
+    char user_auth_list[MAX_USER_NUM][PARAM_BUF_LEN];
+    int num_user;
+    int ret;
 
+    ret = load_user_auth_list(&num_user, user_auth_list);
+    if(ret < 0) 
+        return -1;
+    ret = search_user_in_list(account_nickname ,num_user, user_auth_list);
+    // 존재하지 않는 유저(해당 이름의 credential 파일이 없음)
+    if(ret < 0)
+        return -1;
     // 구글 API를 위한 drive_auth.json 을 앱에서 요청한 계정으로 바꿈
     sprintf(sys_command, "cp %s%s_auth.json ~/.credentials/drive-python-quickstart.json", drive_auth_path, account_nickname);
     system(sys_command);
     return 0;
 }
 
-
 //REQU_CHANGE_DRIVE_AUTH
 int request_change_drive_auth(BMessage *request, BMessage *response){
     int ret;
     char account_nickname[PARAM_BUF_LEN] = {0};
 
-    response->id = RESP_SET_DRIVE_AUTH;
+    response->id = RESP_CHANGE_DRIVE_AUTH;
 
     strcpy(account_nickname, request->param1);
     ret = change_drive_auth_json(account_nickname)
@@ -560,6 +640,56 @@ int request_change_drive_auth(BMessage *request, BMessage *response){
     strcpy(response->param1, account_nickname);
     response->state = RESULT_OK;
 }
+/* =================================== */
+
+int delete_drive_auth_json(char *account_nickname){
+    char drive_auth[PARAM_BUF_LEN] = {0};
+    char user_auth_list[MAX_USER_NUM][PARAM_BUF_LEN];
+    int num_user;
+    int ret;
+
+    load_user_auth_list(&num_user, user_auth_list);
+    ret = search_user_in_list(account_nickname ,num_user, user_auth_list);
+    // 존재하지 않는 유저(해당 이름의 credential 파일이 없음)
+    if(ret < 0)
+        return -1;
+    //해당 유저 제외(삭제)하고 리스트파일 저장
+    save_user_auth_list_except_index(&num_user, user_auth_list, ret);
+
+    //해당 유저 drive_auth.json 삭제
+    sprintf(drive_auth, "./driveAuth/%s_auth.json", account_nickname);
+    ret = remove(drive_auth);
+    if(ret < 0)
+        return -1;
+
+    return 0;
+}
+//REQU_DEL_DRIVE_AUTH
+int request_del_drive_auth(BMessage *request, BMessage *response){
+    int ret;
+    char account_nickname[PARAM_BUF_LEN] = {0};
+    char users[PARAM_BUF_LEN] = {0};
+
+    response->id = RESP_DEL_DRIVE_AUTH;
+
+    strcpy(account_nickname, request->param1);
+    //해당 계정 삭제
+    ret = delete_drive_auth_json(account_nickname)
+    if(ret < 0){
+        response->state = RESULT_ERROR;
+        return -1;
+    }
+    
+    //삭제된 리스트 반환
+    ret = get_auth_users_list(users);
+    printf("\request_set_drive_auth(): RESULT_OK");
+
+    strcpy(response->param1, account_nickname);
+    strcpy(response->param2, users);
+    response->state = RESULT_OK;
+}
+
+
 /* =================================== */
 
 /* =================================== */
@@ -578,8 +708,8 @@ int operate_message(char *command, char *response){
     printf("param2 : [%s]\n", requ_message.param2);
 
     switch(requ_message.id){
-        case REQU_WIFI_INFO:
-            ret = request_wifi_info(&requ_message, &resp_message);
+        case REQU_GET_WIFI_INFO:
+            ret = request_get_wifi_info(&requ_message, &resp_message);
             break;
 
         case REQU_SET_WIFI:
@@ -590,6 +720,10 @@ int operate_message(char *command, char *response){
             ret = request_set_client_secret(&requ_message, &resp_message);
             break;
 
+        case REQU_GET_USERS_LIST:
+            ret = request_get_users_list(&requ_message, &resp_message);
+            break;
+
         case REQU_ADD_DRIVE_AUTH:
             request_add_drive_auth(&requ_message, &resp_message);
             break;
@@ -597,6 +731,11 @@ int operate_message(char *command, char *response){
         case REQU_CHANGE_DRIVE_AUTH:
             request_change_drive_auth(&requ_message, &resp_message);
             break;
+
+        case REQU_DEL_DRIVE_AUTH:
+            request_del_drive_auth(&requ_message, &resp_message);
+            break;
+
         default:
             break;
     }
@@ -644,9 +783,6 @@ void write_server(int client, char *message) {
 int main()
 {
     int client = init_server();
-
-    // user_auth_list.dat에 있는 유저 목록 초기화
-    load_user_auth_list(&num_user, user_auth_list);
 
     while(1)
     {
