@@ -230,22 +230,41 @@ void record_cluster_no()
 void record_entry_info(unsigned char *entry)
 {
     int i;
-    struct fat_dir_entry *item = NULL;
+    char filename[FILE_NAME_FULL];
+    struct fat_dir_entry *item;
     
     for (i=0; i<FAT_CLUSTER_SIZE; i+=FAT_DIR_ENTRY_SIZE) {
         item = (struct fat_dir_entry*) (entry + i);
         
-        if (item->attr == ENTRY_DIR || item->attr == ENTRY_FILE) {
-            unsigned int cluster = get_cluster_from_entry(item);
+        unsigned int cluster = get_cluster_from_entry(item);
+        
+        if (item->attr == ENTRY_FILE) {
+            if (item->name[0] == ENTRY_REMOVED) {
+                // Need to add remove file function
+                cluster_info[cluster].dirty = 0;
+                
+                continue;
+            }
+            
+            strcpy(filename, cluster_info[cluster].filename);
+            
+            cluster_info[cluster].attr = ATTR_FILE;
+            get_filename_from_entry(item, cluster_info[cluster].filename);
+            
+            write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
             
             if (cluster_info[cluster].dirty) {
-                get_filename_from_entry(item, cluster_info[cluster].filename);
+                upload_file(cluster_info[cluster].filename);
+                cluster_info[cluster].dirty = 0;
                 
-                if (item->attr == ENTRY_DIR)
-                    cluster_info[cluster].attr = ATTR_DIR;
-                else
-                    cluster_info[cluster].attr = ATTR_FILE;
+                printf("<<<Cluster %d is dirty...>>>\n", cluster);
             }
+            else {
+                printf("<<<Cluster %d is clean...>>>\n", cluster);
+            }
+        }
+        else if (item->attr == ENTRY_DIR) {
+            cluster_info[cluster].attr = ATTR_DIR;
         }
     }
 }
