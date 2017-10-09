@@ -363,7 +363,7 @@ int create_client_secret_json(char *client_id, char *client_secret){
     FILE *json_fp;
 
     //json_fp = fopen("../../googledrive/list/client_secret.json","w");
-    csj_fp = fopen("../../googledrive/authority/client_secret.json","w");
+    json_fp = fopen("../../googledrive/authority/client_secret.json","w");
     fprintf(json_fp,"\
 {\"installed\":\n\
     {\n\
@@ -623,7 +623,7 @@ int request_change_drive_auth(BMessage *request, BMessage *response){
     response->id = RESP_CHANGE_DRIVE_AUTH;
 
     strcpy(account_nickname, request->param1);
-    ret = change_drive_auth_json(account_nickname)
+    ret = change_drive_auth_json(account_nickname);
     if(ret < 0){
         return -1;
     }
@@ -667,7 +667,7 @@ int request_del_drive_auth(BMessage *request, BMessage *response){
 
     strcpy(account_nickname, request->param1);
     //해당 계정 삭제
-    ret = delete_drive_auth_json(account_nickname)
+    ret = delete_drive_auth_json(account_nickname);
     if(ret < 0){
         return -1;
     }
