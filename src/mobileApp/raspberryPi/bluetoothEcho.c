@@ -312,13 +312,12 @@ int request_get_wifi_info(BMessage *request, BMessage *response){
     ret = get_wifi_ssid(ssid);
     
     if(ret < 0){
-        response->state = RESULT_ERROR;
         return -1;
     }
     else if(strlen(ssid) == 0){
         printf("\request_get_wifi_info(): RESULT_FAIL");
         response->state = RESULT_FAIL;
-        return -1;
+        return 0;
     }
     printf("\request_get_wifi_info(): RESULT_OK [%s]\n", ssid);
     response->state = RESULT_OK;
@@ -339,7 +338,6 @@ int request_set_wifi(BMessage *request, BMessage *response){
     strcpy(pw, request->param2);
 	ret = set_wifi(ssid, pw);
     if(ret < 0){
-        response->state = RESULT_ERROR;
         return -1;
     }
 
@@ -347,13 +345,12 @@ int request_set_wifi(BMessage *request, BMessage *response){
 
     response->id = RESP_SET_WIFI;
     if(ret < 0){
-        response->state = RESULT_ERROR;
         return -1;
     }
 	else if(strlen(ssid) == 0){
 		printf("\request_set_wifi(): RESULT_FAIL");
         response->state = RESULT_FAIL;
-		return -1;
+		return 0;
 	}
 	printf("\request_set_wifi(): RESULT_OK [%s]\n", ssid);
     
@@ -401,7 +398,6 @@ int request_set_client_secret(BMessage *request, BMessage *response){
 
     ret = create_client_secret_json(client_id, client_secret);
     if(ret < 0){
-        response->state = RESULT_ERROR;
         return -1;
     }
     
@@ -551,7 +547,6 @@ int request_get_users_list(BMessage *request, BMessage *response){
 
     ret = get_auth_users_list(users);
     if(ret < 0){
-        response->state = RESULT_ERROR;
         return -1;
     }
     printf("\request_get_users_list(): RESULT_OK");
@@ -576,7 +571,6 @@ int request_add_drive_auth(BMessage *request, BMessage *response){
 
     ret = create_drive_auth_json(account_nickname, verification_code, users);
     if(ret < 0){
-        response->state = RESULT_ERROR;
         return -1;
     }
     printf("\request_add_drive_auth(): RESULT_OK");
@@ -631,7 +625,6 @@ int request_change_drive_auth(BMessage *request, BMessage *response){
     strcpy(account_nickname, request->param1);
     ret = change_drive_auth_json(account_nickname)
     if(ret < 0){
-        response->state = RESULT_ERROR;
         return -1;
     }
     
@@ -676,7 +669,6 @@ int request_del_drive_auth(BMessage *request, BMessage *response){
     //해당 계정 삭제
     ret = delete_drive_auth_json(account_nickname)
     if(ret < 0){
-        response->state = RESULT_ERROR;
         return -1;
     }
     
@@ -698,7 +690,7 @@ int operate_message(char *command, char *response){
     int ret = 0;
 
     BMessage requ_message;
-    BMessage resp_message = {MESG_NONE, RESULT_OK, "\0", "\0"};
+    BMessage resp_message = {MESG_NONE, RESULT_FAIL, "\0", "\0"};
 
     printf("received [%s]\n", command);
     parse_bmsg(command, &requ_message);
@@ -725,19 +717,23 @@ int operate_message(char *command, char *response){
             break;
 
         case REQU_ADD_DRIVE_AUTH:
-            request_add_drive_auth(&requ_message, &resp_message);
+            ret = request_add_drive_auth(&requ_message, &resp_message);
             break;
 
         case REQU_CHANGE_DRIVE_AUTH:
-            request_change_drive_auth(&requ_message, &resp_message);
+            ret = request_change_drive_auth(&requ_message, &resp_message);
             break;
 
         case REQU_DEL_DRIVE_AUTH:
-            request_del_drive_auth(&requ_message, &resp_message);
+            ret = request_del_drive_auth(&requ_message, &resp_message);
             break;
 
         default:
             break;
+    }
+
+    if(ret < 0){
+        resp_message.state = RESULT_ERROR;
     }
 
     sprintf(response, "%d$%d$%s$%s\n", resp_message.id, resp_message.state, resp_message.param1, resp_message.param2);
