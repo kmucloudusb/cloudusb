@@ -690,7 +690,7 @@ int operate_message(char *command, char *response){
     int ret = 0;
 
     BMessage requ_message;
-    BMessage resp_message = {MESG_NONE, RESULT_FAIL, "\0", "\0"};
+    BMessage resp_message = {MESG_NONE, RESULT_FAIL, " ", " "};
 
     printf("received [%s]\n", command);
     parse_bmsg(command, &requ_message);
