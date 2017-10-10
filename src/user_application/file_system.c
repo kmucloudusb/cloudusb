@@ -7,6 +7,7 @@
 static char *path_list = "/home/pi/cloudusb/src/googledrive/list/list.py";
 static char *path_downloader = "/home/pi/cloudusb/src/googledrive/download/download.py";
 static char *path_uploader = "/home/pi/cloudusb/src/googledrive/upload/upload.py";
+static char *path_remover = "/home/pi/cloudusb/src/googledrive/delete/delete.py";
 static char *path_pipe = "/home/pi/cloudusb/bin/myfifo";
 
 static unsigned char reserved_area[FAT_SECTOR_SIZE];
@@ -23,9 +24,6 @@ void fat_init()
     
     // Create fat area
     create_fat_area();
-    
-    // Set root dir entry type
-    set_root_dir_entry();
 }
 
 void sync_with_cloud()
@@ -48,6 +46,9 @@ void sync_with_cloud()
     int dir;
     int cluster = 3;
     
+    // Set root dir entry type
+    cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
+    
     // Receive information from Google Drive via pipe
     read_pipe(filelist);
     
@@ -59,8 +60,8 @@ void sync_with_cloud()
         write_fat_area(cluster, fsize);
         
         // Extract short file name for entry
-        fatfs_split_path(full_path, path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
-        fatfs_lfn_create_sfn(shortfilename, filename);
+        split_path(full_path, path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
+        get_sfn_from_lfn(shortfilename, filename);
         memcpy(entry.name, shortfilename, FAT_SFN_SIZE_FULL);
         
         entry.first_cluster_high = (unsigned short) ((cluster & 0xFFFF0000) >> 16);
@@ -132,6 +133,8 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
                    fat_area + ((sector - FAT_FAT_AREA_POSITION) % (FAT_ROOT_DIR_POSISTION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE),
                    FAT_SECTOR_SIZE);
             
+            clean_fat_area();
+            
             offset += FAT_SECTOR_SIZE;
             count --;
             sector += 1;
@@ -148,17 +151,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             count -= FAT_SECTOR_PER_CLUSTER;
             sector += FAT_SECTOR_PER_CLUSTER;
             
-            
-            //        clean_fat_area();
             clean_entries();
-            
-            //        if (cluster_info[cluster].attr == ATTR_DIR)
-            //            memcpy(buffer, cluster_info[cluster].buffer, count*FAT_SECTOR_SIZE);
-            //        else {
-            //            if (read_file(cluster, buffer, count * FAT_SECTOR_SIZE) == -1) {
-            //                perror("read_file");
-            //            }
-            //        }
         }
         // Meaning less
         else {
@@ -271,13 +264,21 @@ void clean_fat_area()
 {
     int i;
     int count = 0;
+    unsigned int cluster_chain_info;
     puts("[record cluster no]");
     
     for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER*FAT_CLUSTER_CHAIN_MARKER_LEN;
          i<CLUSTER_INFO_FULL;
          i+=FAT_CLUSTER_CHAIN_MARKER_LEN)
     {
-        if ((get_32bit(fat_area + i) & FAT_END_OF_CLUSTER_CHAIN_MARKER) == FAT_END_OF_CLUSTER_CHAIN_MARKER) {
+        cluster_chain_info = get_32bit(fat_area + i);
+        
+        if (cluster_chain_info == 0x00) {
+            count = 0;
+            continue;
+        }
+        
+        if ((cluster_chain_info & FAT_END_OF_CLUSTER_CHAIN_MARKER) == FAT_END_OF_CLUSTER_CHAIN_MARKER) {
             cluster_info[i/FAT_CLUSTER_CHAIN_MARKER_LEN].cluster_no = count;
             count = 0;
         }
@@ -316,20 +317,6 @@ unsigned int get_cluster_from_entry(struct fat_dir_entry *entry)
     return ( (((unsigned int) entry->first_cluster_high) << 16) | entry->first_cluster_low );
 }
 
-int read_file(int cluster, unsigned char *buffer, int size)
-{
-    int fd = open(cluster_info[cluster].filename, O_RDONLY);
-    
-    if (fd >= 0) {
-        read(fd, buffer, size);
-        close(fd);
-        
-        return 1;
-    }
-    
-    return -1;
-}
-
 int write_file(char *filename, unsigned char *buffer, int cluster_no)
 {
     int i;
@@ -354,6 +341,48 @@ int write_file(char *filename, unsigned char *buffer, int cluster_no)
         close(fd);
         
         return 1;
+    }
+    
+    return -1;
+}
+
+void write_fat_area(int cluster, unsigned int size)
+{
+    int loc = 4*cluster;
+    int cluster_no = 0;
+    
+    while (1) {
+        cluster_info[cluster].cluster_no = cluster_no++;
+        
+        if (size > 4096) {
+            fat_area[loc++] = (unsigned char)((++cluster) & 0xFF);
+            fat_area[loc++] = (unsigned char)(((cluster) & 0xFF00) >> 8);
+            fat_area[loc++] = (unsigned char)(((cluster) & 0xFF0000) >> 16);
+            fat_area[loc++] = (unsigned char)(((cluster) & 0xFF000000) >> 24);
+            
+            size -= 4096;
+        }
+        else {
+            fat_area[loc++] = 0xFF;
+            fat_area[loc++] = 0xFF;
+            fat_area[loc++] = 0xFF;
+            fat_area[loc] = 0x0F;
+            
+            break;
+        }
+    }
+}
+
+int insert_dir_entry(unsigned char *rootdir_entry, struct fat_dir_entry *entry)
+{
+    int i;
+    
+    for (i=0; i<ENTRY_PER_CLUSTER; i+=FAT_DIR_ENTRY_SIZE) {
+        if (rootdir_entry[i] == 0x00 || rootdir_entry[i] == 0xE5) {
+            memcpy(rootdir_entry + i, entry, sizeof(struct fat_dir_entry));
+            
+            return 1;
+        }
     }
     
     return -1;
@@ -407,55 +436,20 @@ void upload_file(char *filename)
 }
 
 void remove_file(char *fid) {
+    printf("[upload] %s\n", fid);
+    char cmd[CMD_LEN_FULL] = "python ";
     
+    strncat(cmd, path_remover, strlen(path_remover));
+    strcat(cmd, " --fid ");
+    strcat(cmd, fid);
+    
+    system(cmd);
 }
 
 //-----------------------------------------------------------------------------
 // String Processing Functions
 //-----------------------------------------------------------------------------
-void write_fat_area(int cluster, unsigned int size)
-{
-    int loc = 4*cluster;
-    int cluster_no = 0;
-    
-    while (1) {
-        cluster_info[cluster].cluster_no = cluster_no++;
-        
-        if (size > 4096) {
-            fat_area[loc++] = (unsigned char)((++cluster) & 0xFF);
-            fat_area[loc++] = (unsigned char)(((cluster) & 0xFF00) >> 8);
-            fat_area[loc++] = (unsigned char)(((cluster) & 0xFF0000) >> 16);
-            fat_area[loc++] = (unsigned char)(((cluster) & 0xFF000000) >> 24);
-            
-            size -= 4096;
-        }
-        else {
-            fat_area[loc++] = 0xFF;
-            fat_area[loc++] = 0xFF;
-            fat_area[loc++] = 0xFF;
-            fat_area[loc] = 0x0F;
-            
-            break;
-        }
-    }
-}
-
-int insert_dir_entry(unsigned char *rootdir_entry, struct fat_dir_entry *entry)
-{
-    int i;
-    
-    for (i=0; i<ENTRY_PER_CLUSTER; i+=FAT_DIR_ENTRY_SIZE) {
-        if (rootdir_entry[i] == 0x00 || rootdir_entry[i] == 0xE5) {
-            memcpy(rootdir_entry + i, entry, sizeof(struct fat_dir_entry));
-            
-            return 1;
-        }
-    }
-    
-    return -1;
-}
-
-int fatfs_total_path_levels(char *path)
+int get_total_path_levels(char *path)
 {
     int levels = 0;
     char expectedchar;
@@ -491,7 +485,7 @@ int fatfs_total_path_levels(char *path)
     return levels-1;
 }
 
-int fatfs_get_substring(char *path, int levelreq, char *output, int max_len)
+int get_substring(char *path, int levelreq, char *output, int max_len)
 {
     int i;
     int pathlen=0;
@@ -539,17 +533,17 @@ int fatfs_get_substring(char *path, int levelreq, char *output, int max_len)
         return -1;    // Error
 }
 
-int fatfs_split_path(char *full_path, char *path, int max_path, char *filename, int max_filename)
+int split_path(char *full_path, char *path, int max_path, char *filename, int max_filename)
 {
     int strindex;
     
     // Count the levels to the filepath
-    int levels = fatfs_total_path_levels(full_path);
+    int levels = get_total_path_levels(full_path);
     if (levels == -1)
         return -1;
     
     // Get filename part of string
-    if (fatfs_get_substring(full_path, levels, filename, max_filename) != 0)
+    if (get_substring(full_path, levels, filename, max_filename) != 0)
         return -1;
     
     // If root file
@@ -567,7 +561,7 @@ int fatfs_split_path(char *full_path, char *path, int max_path, char *filename, 
     return 0;
 }
 
-int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
+int get_sfn_from_lfn(char *sfn_output, char *filename)
 {
     int i;
     int dotPos = -1;
@@ -704,9 +698,4 @@ void create_fat_area()
     };
     
     memcpy(fat_area, fat, sizeof(unsigned char)*16);
-}
-
-void set_root_dir_entry()
-{
-    cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
 }
