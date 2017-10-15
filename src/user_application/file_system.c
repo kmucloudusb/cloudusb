@@ -25,7 +25,7 @@ void fat_init()
     set_root_dir_entry();
 }
 
-void write_entries()
+void sync_with_cloud()
 {
     int i;
     char ch = -1;

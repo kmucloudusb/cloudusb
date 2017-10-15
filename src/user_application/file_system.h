@@ -106,7 +106,7 @@ void write_fat_area(int cluster, unsigned int size);
 int write_media(unsigned int sector, unsigned char *buffer, unsigned int count);
 
 int insert_dir_entry(unsigned char *rootdir_entry, struct fat_dir_entry *entry);
-void write_entries();
+void sync_with_cloud();
 
 void fat_init();
 void create_fat_area();
