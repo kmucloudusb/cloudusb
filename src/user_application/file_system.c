@@ -294,7 +294,6 @@ void write_fat_area(int cluster, unsigned int size)
     int cluster_no = 0;
     
     while (1) {
-        cluster_info[cluster].dirty = 0;
         cluster_info[cluster].cluster_no = cluster_no++;
         
         if (size > 4096) {
