@@ -211,13 +211,21 @@ void record_cluster_no()
 {
     int i;
     int count = 0;
+    unsigned int cluster_chain_info;
     puts("[record cluster no]");
     
     for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER*FAT_CLUSTER_CHAIN_MARKER_LEN;
          i<CLUSTER_INFO_FULL;
          i+=FAT_CLUSTER_CHAIN_MARKER_LEN)
     {
-        if ((get_32bit(fat_area + i) & FAT_END_OF_CLUSTER_CHAIN_MARKER) == FAT_END_OF_CLUSTER_CHAIN_MARKER) {
+        cluster_chain_info = get_32bit(fat_area + i);
+        
+        if (cluster_chain_info == FAT_CLUSTER_CHAIN_EMPTY) {
+            count = 0;
+            continue;
+        }
+        
+        if ((cluster_chain_info & FAT_END_OF_CLUSTER_CHAIN_MARKER) == FAT_END_OF_CLUSTER_CHAIN_MARKER) {
             cluster_info[i/FAT_CLUSTER_CHAIN_MARKER_LEN].cluster_no = count;
             count = 0;
         }
