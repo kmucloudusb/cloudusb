@@ -25,13 +25,14 @@
 
 #define ENTRY_DIR 0x10
 #define ENTRY_FILE 0x20
+#define ENTRY_REMOVED 0xE5
 #define ENTRY_FILENAME_BLANK 0x20
 #define ENTRY_PER_CLUSTER 128
 
 #define FAT_RESERVED_AREA_POSITION 0
 #define FAT_RESERVED_AREA_BACKUP_POSITION 1
 #define FAT_FAT_AREA_POSITION 2
-#define FAT_ROOT_DIR_POSISTION 2049
+#define FAT_ROOT_DIR_POSITION 2049
 
 #define FAT_ROOT_DIRECTORY_FIRST_CLUSTER 2
 #define FAT_SECTOR_SIZE 512
@@ -39,12 +40,13 @@
 #define FAT_SECTOR_PER_CLUSTER 8
 #define FAT_DIR_ENTRY_SIZE 32
 #define FAT_SHORT_FILE_NAME_LENGTH_FULL 11
+#define FAT_SFN_SIZE_NAME 8
 #define FAT_SFN_SIZE_FULL 11
 #define FAT_SFN_SIZE_PARTIAL 8
 #define ENTRY_NAME_LENGTH 8
 #define ENTRY_EXTENDER_LENGTH 3
 
-#define FAT_FAT_AREA_FULL (FAT_ROOT_DIR_POSISTION - FAT_FAT_AREA_POSITION)
+#define FAT_FAT_AREA_FULL (FAT_ROOT_DIR_POSITION - FAT_FAT_AREA_POSITION)
 #define FAT_CLUSTER_CHAIN_MARKER_LEN 4
 #define FAT_CLUSTER_CHAIN_EMPTY 0x00
 #define FAT_END_OF_CLUSTER_CHAIN_MARKER 0xF0FFFF0F
@@ -78,6 +80,18 @@ struct fat_dir_entry
 //-----------------------------------------------------------------------------
 // Functions
 //-----------------------------------------------------------------------------
+int is_reserved_area(unsigned int sector);
+int is_fat_area(unsigned int sector);
+int is_entry_area(unsigned int sector);
+int is_valid_count(unsigned int count);
+int is_end_of_filelist(char *filelist, int offset);
+int search_next_empty_cluster(int cluster, unsigned int fsize);
+int search_next_filelist_offset(char *filelist, int offset);
+void record_entry_first_cluster(struct fat_dir_entry *entry, int cluster);
+void record_entry_dir(struct fat_dir_entry *entry, int cluster);
+void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize);
+void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize, int dir);
+
 void fat_init();
 void sync_with_cloud();
 int read_media(unsigned int sector, unsigned char *buffer, unsigned int count);

@@ -25,6 +25,26 @@ void fat_init()
     set_root_dir_entry();
 }
 
+int is_reserved_area(unsigned int sector)
+{
+    return ( (sector == FAT_RESERVED_AREA_POSITION) || (sector == FAT_RESERVED_AREA_BACKUP_POSITION) );
+}
+
+int is_fat_area(unsigned int sector)
+{
+    return ( (FAT_FAT_AREA_POSITION <= sector) && (sector < FAT_ROOT_DIR_POSITION) );
+}
+
+int is_entry_area(unsigned int sector)
+{
+    return ( (FAT_ROOT_DIR_POSITION <= sector) && (sector < (FAT_ROOT_DIR_POSITION + CLUSTER_INFO_FULL)) );
+}
+
+int is_valid_count(unsigned int count)
+{
+    return ( (count != 0) && (count <= 32) );
+}
+
 int is_end_of_filelist(char *filelist, int offset)
 {
     return ( (filelist[offset] == '\0') || (filelist[offset+1] == '\0') );
@@ -52,7 +72,7 @@ void record_entry_first_cluster(struct fat_dir_entry *entry, int cluster)
 
 void record_entry_dir(struct fat_dir_entry *entry, int cluster)
 {
-    entry->attr = FAT_ENTRY_DIR;
+    entry->attr = ENTRY_DIR;
     entry->size = 0;
     
     cluster_info[cluster].attr = ATTR_DIR;
@@ -63,7 +83,7 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
     int i;
     int fd;
     
-    entry->attr = FAT_ENTRY_FILE;
+    entry->attr = ENTRY_FILE;
     entry->size = fsize;
     
     download_file(fid);
@@ -147,9 +167,9 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     printf("[read] sector = %u\n", sector);
     puts("");
     
-    while (count != 0 && count <= 32) {
+    while (is_valid_count(count)) {
         // Reserved Area
-        if (FAT_RESERVED_AREA_POSITION == sector || sector == FAT_RESERVED_AREA_BACKUP_POSITION) {
+        if (is_reserved_area(sector)) {
             memcpy(buffer + offset,
                    reserved_area + sector % FAT_RESERVED_AREA_BACKUP_POSITION * FAT_SECTOR_SIZE,
                    FAT_SECTOR_SIZE);
@@ -160,9 +180,9 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         }
         
         // Fat Area
-        else if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSISTION) {
+        else if (is_fat_area(sector)) {
             memcpy(buffer + offset,
-                   fat_area + ((sector - FAT_FAT_AREA_POSITION) % (FAT_ROOT_DIR_POSISTION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE),
+                   fat_area + ((sector - FAT_FAT_AREA_POSITION) % (FAT_ROOT_DIR_POSITION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE),
                    FAT_SECTOR_SIZE);
             
             offset += FAT_SECTOR_SIZE;
@@ -171,9 +191,9 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         }
         
         // Entries
-        else if (FAT_ROOT_DIR_POSISTION <= sector && sector < FAT_ROOT_DIR_POSISTION + CLUSTER_INFO_FULL) {
+        else if (is_entry_area(sector)) {
             unsigned int cluster =
-            (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
+            (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
             
             memcpy(buffer + offset, cluster_info[cluster].buffer, FAT_CLUSTER_SIZE);
             
@@ -181,7 +201,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             count -= FAT_SECTOR_PER_CLUSTER;
             sector += FAT_SECTOR_PER_CLUSTER;
             
-            clean_entries();
+            clean_dirty_cluster();
         }
         // Meaning less
         else {
@@ -202,11 +222,11 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     unsigned int offset = 0;
     
     printf("\n[wrtie] sector = %u cluster = %u size = %u\n",
-           sector, (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER, count);
+           sector, (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER, count);
     
-    while (count != 0 && count <= 32) {
+    while (is_valid_count(count)) {
         // Fat Area
-        if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSISTION) {
+        if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSITION) {
             int pos = ((sector - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE);
             
             memcpy(fat_area + pos, buffer + offset, FAT_SECTOR_SIZE);
@@ -218,13 +238,13 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         
         // Entries
         else {
-            int cluster = (sector - FAT_ROOT_DIR_POSISTION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
+            int cluster = (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
             
             memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_CLUSTER_SIZE);
             cluster_info[cluster].dirty = 1;
             
             printf("((cluster %d is dirty))\n", cluster);
-            clean_entries();
+            clean_dirty_cluster();
             
             offset += FAT_CLUSTER_SIZE;
             count -= FAT_SECTOR_PER_CLUSTER;
