@@ -283,22 +283,8 @@ void clean_dirty_cluster()
     puts("[clean dirty cluster]");
     
     for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER; i<CLUSTER_INFO_FULL; i++) {
-        if (cluster_info[i].attr == ATTR_DIR) {
+        if (cluster_info[i].attr == ATTR_DIR)
             record_entry_info(cluster_info[i].buffer);
-        }
-        else if (cluster_info[i].attr == ATTR_FILE) {
-            if (cluster_info[i].dirty) {
-                if (write_file(cluster_info[i].filename, cluster_info[i].buffer, cluster_info[i].cluster_no) == -1) {
-                    puts("Write fail...");
-                    
-                    return ;
-                }
-                
-                upload_file(cluster_info[i].filename);
-                
-                cluster_info[i].dirty = 0;
-            }
-        }
     }
 }
 
