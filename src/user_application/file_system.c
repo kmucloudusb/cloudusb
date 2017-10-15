@@ -239,7 +239,7 @@ void record_entry_info(unsigned char *entry)
         unsigned int cluster = get_cluster_from_entry(item);
         
         if (item->attr == ENTRY_FILE) {
-            if (item->name[0] == ENTRY_REMOVED) {
+            if (item->name[0] == ENTRY_REMOVED && cluster_info[cluster].dirty) {
                 // Need to add remove file function
                 cluster_info[cluster].dirty = 0;
                 
