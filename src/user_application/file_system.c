@@ -25,12 +25,77 @@ void fat_init()
     set_root_dir_entry();
 }
 
-void sync_with_cloud()
+int is_end_of_filelist(char *filelist, int offset)
+{
+    return ( (filelist[offset] == '\0') || (filelist[offset+1] == '\0') );
+}
+
+int search_next_empty_cluster(int cluster, unsigned int fsize)
+{
+    if (fsize == 0)
+        return cluster + 1;
+    return ( cluster + (fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0) );
+}
+
+int search_next_filelist_offset(char *filelist, int offset)
+{
+    while (filelist[offset] != '\n' && filelist[offset] != '\0')
+        offset ++;
+    return ( ++ offset );
+}
+
+void record_entry_first_cluster(struct fat_dir_entry *entry, int cluster)
+{
+    entry->first_cluster_high = (unsigned short) ((cluster & 0xFFFF0000) >> 16);
+    entry->first_cluster_low = (unsigned short) cluster;
+}
+
+void record_entry_dir(struct fat_dir_entry *entry, int cluster)
+{
+    entry->attr = FAT_ENTRY_DIR;
+    entry->size = 0;
+    
+    cluster_info[cluster].attr = ATTR_DIR;
+}
+
+void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize)
 {
     int i;
-    char ch = -1;
     int fd;
-    int offset = 0;
+    
+    entry->attr = FAT_ENTRY_FILE;
+    entry->size = fsize;
+    
+    download_file(fid);
+    
+    if ( ((fd = open(fid, O_RDONLY)) >= 0) ) {
+        for (i = cluster;
+             i < (cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0)));
+             i++)
+        {
+            cluster_info[i].attr = ATTR_FILE;
+            cluster_info[i].cluster_no = i - cluster;
+            read(fd, cluster_info[cluster].buffer, FAT_CLUSTER_SIZE);
+            strcpy(cluster_info[i].filename, fid);
+        }
+        
+        close(fd);
+    }
+}
+
+void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize, int dir)
+{
+    record_entry_first_cluster(entry, cluster);
+    
+    if (dir)
+        record_entry_dir(entry, cluster);
+    else
+        record_entry_file(entry, cluster, fid, fsize);
+}
+
+void sync_with_cloud()
+{
+    int offset = 1;
     
     char filelist[PIPE_LEN_FULL] = {0};
     char full_path[PIPE_LEN_FULL];
@@ -40,15 +105,15 @@ void sync_with_cloud()
     char fid[FILE_ID_FULL];
     
     struct fat_dir_entry entry = {0};
-    unsigned int fsize;
     
     int dir;
+    unsigned int fsize;
     int cluster = 3;
     
     // Receive information from Google Drive via pipe
     read_pipe(filelist);
     
-    while(ch != '\0' && filelist[offset] != 0)
+    while(!is_end_of_filelist(filelist, offset-1))
     {
         sscanf(filelist+offset, "%512s %u %s %d", full_path, &fsize, fid, &dir);
         
@@ -60,47 +125,17 @@ void sync_with_cloud()
         fatfs_lfn_create_sfn(shortfilename, filename);
         memcpy(entry.name, shortfilename, FAT_SFN_SIZE_FULL);
         
-        entry.first_cluster_high = (unsigned short) ((cluster & 0xFFFF0000) >> 16);
-        entry.first_cluster_low = (unsigned short) cluster;
-        
-        if (dir) {
-            entry.attr = ENTRY_DIR;
-            entry.size = 0;
-            
-            cluster_info[cluster].attr = ATTR_DIR;
-        }
-        else {
-            entry.attr = ENTRY_FILE;
-            entry.size = fsize;
-            
-            download_file(fid);
-            
-            if ( ((fd = open(fid, O_RDONLY)) >= 0) ) {
-                for (i = cluster;
-                     i < (cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0)));
-                     i++)
-                {
-                    cluster_info[i].attr = ATTR_FILE;
-                    read(fd, cluster_info[cluster].buffer, FAT_CLUSTER_SIZE);
-                    strcpy(cluster_info[i].filename, fid);
-                }
-                
-                close(fd);
-            }
-        }
+        set_dir_entry_info(&entry, cluster, fid, fsize, dir);
         
         insert_dir_entry(cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].buffer, &entry);
         
         printf("\n[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
         
         // Search next empty cluster
-        if (fsize == 0 || dir)
-            cluster ++;
-        else
-            cluster += (fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0);
+        cluster = search_next_empty_cluster(cluster, fsize);
         
         // Search next line first character
-        while((ch = *(filelist+(offset++))) != '\n' && ch != '\0');
+        offset = search_next_filelist_offset(filelist, offset);
     }
 }
 
