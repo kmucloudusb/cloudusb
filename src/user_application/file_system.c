@@ -558,17 +558,25 @@ int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
     // Add filename part
     pos = 0;
     for (i=0;i<len;i++) {
-        if ( (filename[i]!=' ') && (filename[i]!='.') )
+        if ( (filename[i]!=' ') && (filename[i]!='.') ) {
+            if (filename[i] >= 'a' && filename[i] <= 'z')
+                sfn_output[pos++] = filename[i] - 'a' + 'A';
+            else
                 sfn_output[pos++] = filename[i];
+        }
         
         // Fill upto 8 characters
-        if (pos==FAT_SFN_SIZE_PARTIAL)
+        if (pos==FAT_SFN_SIZE_NAME)
             break;
     }
     
     // Add extension part
-    for (i=FAT_SFN_SIZE_PARTIAL;i<FAT_SFN_SIZE_FULL;i++)
-        sfn_output[i] = ext[i-FAT_SFN_SIZE_PARTIAL];
+    for (i=FAT_SFN_SIZE_NAME;i<FAT_SFN_SIZE_FULL;i++) {
+        if (ext[i - FAT_SFN_SIZE_NAME] >= 'a' && ext[i - FAT_SFN_SIZE_NAME] <= 'z')
+            sfn_output[i] = ext[i - FAT_SFN_SIZE_NAME] - 'a' + 'A';
+        else
+            sfn_output[i] = ext[i - FAT_SFN_SIZE_NAME];
+    }
     
     return 1;
 }
