@@ -81,7 +81,7 @@ def main():
         for item in first_folder_item:
             root_dir_id = item['id']
 
-    file_path = "../download/"
+    file_path = "./"
     file_upload(service, root_dir_id, file_path, file_id)
 
 def file_upload(service, root_dir_id, file_path, file_id):
