@@ -39,7 +39,7 @@ SCOPES = 'https://www.googleapis.com/auth/drive' # all permision
 
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Drive API Python Quickstart'
-FOLDER = "application/vnd.google-apps.folder"  # 구글 드라이브 API에선 타입이 이 스트링인 파일을 폴더로 인식함
+FOLDER_TYPE = "application/vnd.google-apps.folder"  # 구글 드라이브 API에선 타입이 이 스트링인 파일을 폴더로 인식함
 ROOT_FOLDER = "cloud_usb_test"  # 테스트를 위한 최상위 폴더
 
 
@@ -72,7 +72,7 @@ def main():
 
     # 1. ROOT_DIRECTORY 이름을 가진 최상위 폴더를 찾음
     first_folder = service.files().list(
-        q=("mimeType = 'application/vnd.google-apps.folder' and name = '%s'" % ROOT_FOLDER)).execute()
+        q=("mimeType = '%s' and name = '%s'" %(FOLDER_TYPE, ROOT_FOLDER))).execute()
     first_folder_item = first_folder.get('files', [])
     root_dir_id = 0
     if not first_folder_item:
@@ -86,10 +86,10 @@ def main():
 
 def file_upload(service, root_dir_id, file_path, file_id):
 
-    prevPath = [root_dir_id]
+    prev_path = [root_dir_id]
     file_metadata = { 
     'name' : file_id,
-    'parents' : prevPath }
+    'parents' : prev_path }
 
     file_name = file_id;
     file_full_path = file_path + file_name;
@@ -100,7 +100,7 @@ def file_upload(service, root_dir_id, file_path, file_id):
     file = service.files().create(body=file_metadata,
                                         media_body=media,
                                         fields='id').execute()
-    print('File ID: %s' % file.get('id'))
+    print('File Upload Success: %s' % file.get('id'))
 
 if __name__ == '__main__':
     main()

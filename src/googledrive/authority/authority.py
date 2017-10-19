@@ -64,14 +64,10 @@ def get_credentials():
 def main():
     # 구글 계정 권한 얻기
     credentials = get_credentials()
-    http = credentials.authorize(httplib2.Http())
-    service = discovery.build('drive', 'v3', http=http)
-
-    file_delete(service, file_id)
-
-def file_delete(service, file_id):
-    file = service.files().delete(fileId=file_id).execute()
-    print('File Delete Success: %s' % file_id)
+    if(credentials) :
+        print("Create auth.json: Success")
+    else:
+        print("Create auth.json: Fail")
 
 if __name__ == '__main__':
     main()
