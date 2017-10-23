@@ -72,7 +72,7 @@ void record_entry_first_cluster(struct fat_dir_entry *entry, int cluster)
 
 void record_entry_dir(struct fat_dir_entry *entry, int cluster)
 {
-    entry->attr = ENTRY_DIR;
+    entry->attr = FAT_ENTRY_DIR;
     entry->size = 0;
     
     cluster_info[cluster].attr = ATTR_DIR;
@@ -83,7 +83,7 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
     int i;
     int fd;
     
-    entry->attr = ENTRY_FILE;
+    entry->attr = FAT_ENTRY_FILE;
     entry->size = fsize;
     
     download_file(fid);
@@ -128,7 +128,7 @@ void sync_with_cloud()
     
     int dir;
     unsigned int fsize;
-    int cluster = FAT_ROOT_DIRECTORY_FIRST_CLUSTER+1;
+    int cluster = FAT_ROOT_DIR_FIRST_CLUSTER+1;
     
     // Receive information from Google Drive via pipe
     read_pipe(filelist);
@@ -147,7 +147,7 @@ void sync_with_cloud()
         
         set_dir_entry_info(&entry, cluster, fid, fsize, dir);
         
-        insert_dir_entry(cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].buffer, &entry);
+        insert_dir_entry(cluster_info[FAT_ROOT_DIR_FIRST_CLUSTER].buffer, &entry);
         
         printf("\n[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
         
@@ -184,7 +184,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         // Entries
         else if (is_entry_area(sector)) {
             unsigned int cluster =
-            (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
+            (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIR_FIRST_CLUSTER;
             
             memcpy(buffer + offset, cluster_info[cluster].buffer, FAT_SECTOR_SIZE);
             
@@ -221,7 +221,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         
         // Entries
         else {
-            int cluster = (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
+            int cluster = (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIR_FIRST_CLUSTER;
             
             memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_SECTOR_SIZE);
             cluster_info[cluster].dirty = 1;
@@ -252,7 +252,7 @@ void record_cluster_no()
     unsigned int cluster_chain_info;
     puts("[record cluster no]");
     
-    for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER*FAT_CLUSTER_CHAIN_MARKER_LEN;
+    for (i=FAT_ROOT_DIR_FIRST_CLUSTER*FAT_CLUSTER_CHAIN_MARKER_LEN;
          i<CLUSTER_INFO_FULL;
          i+=FAT_CLUSTER_CHAIN_MARKER_LEN)
     {
@@ -279,13 +279,13 @@ void record_entry_info(unsigned char *entry)
     char filename[FILE_NAME_FULL];
     struct fat_dir_entry *item;
     
-    for (i=0; i<FAT_CLUSTER_SIZE; i+=FAT_DIR_ENTRY_SIZE) {
+    for (i=0; i<FAT_CLUSTER_SIZE; i+=FAT_ENTRY_SIZE) {
         item = (struct fat_dir_entry*) (entry + i);
         
         unsigned int cluster = get_cluster_from_entry(item);
         
-        if (item->attr == ENTRY_FILE) {
-            if (item->name[0] == ENTRY_REMOVED && cluster_info[cluster].dirty) {
+        if (item->attr == FAT_ENTRY_FILE) {
+            if (item->name[0] == FAT_ENTRY_REMOVED && cluster_info[cluster].dirty) {
                 // Need to add remove file function
                 cluster_info[cluster].dirty = 0;
                 
@@ -304,7 +304,7 @@ void record_entry_info(unsigned char *entry)
                 cluster_info[cluster].dirty = 0;
             }
         }
-        else if (item->attr == ENTRY_DIR) {
+        else if (item->attr == FAT_ENTRY_DIR) {
             cluster_info[cluster].attr = ATTR_DIR;
         }
     }
@@ -314,7 +314,7 @@ void clean_dirty_cluster()
 {
     int i;
     
-    for (i=FAT_ROOT_DIRECTORY_FIRST_CLUSTER; i<CLUSTER_INFO_FULL; i++) {
+    for (i=FAT_ROOT_DIR_FIRST_CLUSTER; i<CLUSTER_INFO_FULL; i++) {
         if (cluster_info[i].attr == ATTR_DIR)
             record_entry_info(cluster_info[i].buffer);
     }
@@ -351,8 +351,8 @@ int insert_dir_entry(unsigned char *rootdir_entry, struct fat_dir_entry *entry)
 {
     int i;
     
-    for (i=0; i<ENTRY_PER_CLUSTER; i+=FAT_DIR_ENTRY_SIZE) {
-        if (rootdir_entry[i] == ENTRY_EMPTY || rootdir_entry[i] == ENTRY_REMOVED) {
+    for (i=0; i<FAT_ENTRY_PER_CLUSTER; i+=FAT_ENTRY_SIZE) {
+        if (rootdir_entry[i] == FAT_ENTRY_EMPTY || rootdir_entry[i] == FAT_ENTRY_REMOVED) {
             memcpy(rootdir_entry + i, entry, sizeof(struct fat_dir_entry));
             
             return 1;
@@ -413,8 +413,8 @@ void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
     int i, j;
     char fn_no = 0;
     
-    for (i=0; i<ENTRY_NAME_LENGTH; i++) {
-        if (entry->name[i] == ENTRY_FILENAME_BLANK)
+    for (i=0; i<FAT_SFN_SIZE_NAME; i++) {
+        if (entry->name[i] == FAT_ENTRY_FILENAME_BLANK)
             continue;
         
         filename[fn_no++] = entry->name[i];
@@ -422,8 +422,8 @@ void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
     
     filename[fn_no++] = '.';
     
-    for (j=0; j<ENTRY_EXTENDER_LENGTH; j++, i++) {
-        if (entry->name[i] == ENTRY_FILENAME_BLANK)
+    for (j=0; j<FAT_SFN_SIZE_EXT; j++, i++) {
+        if (entry->name[i] == FAT_ENTRY_FILENAME_BLANK)
             break;
         
         filename[fn_no++] = entry->name[i];
@@ -708,6 +708,6 @@ void create_fat_area()
 
 void set_root_dir_entry()
 {
-    cluster_info[FAT_ROOT_DIRECTORY_FIRST_CLUSTER].attr = ATTR_DIR;
+    cluster_info[FAT_ROOT_DIR_FIRST_CLUSTER].attr = ATTR_DIR;
 }
 
