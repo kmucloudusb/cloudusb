@@ -128,7 +128,7 @@ void sync_with_cloud()
     
     int dir;
     unsigned int fsize;
-    int cluster = FAT_ENTRY_FIRST_CLUSTER;
+    int cluster = FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
     
     // Receive information from Google Drive via pipe
     read_pipe(filelist);
