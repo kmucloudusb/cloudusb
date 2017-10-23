@@ -42,7 +42,7 @@ int is_entry_area(unsigned int sector)
 
 int is_valid_count(unsigned int count)
 {
-    return ( (count != 0) && (count <= FAT_BUFF_LEN_FULL) );
+    return (count != 0);
 }
 
 int is_end_of_filelist(char *filelist, int offset)
