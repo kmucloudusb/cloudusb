@@ -13,22 +13,40 @@ from oauth2client.file import Storage
 from apiclient.http import MediaIoBaseDownload
 from apiclient.http import MediaFileUpload
 
-file_name = ''
-PIPE_PATH= ''
+
 
 try:
     import argparse
 
-    tools.argparser.add_argument('--fifo', default='./../myfifo', help='pipe path')
-    tools.argparser.add_argument('--fname', default='-1', help='file name IN current directory')
+    tools.argparser.add_argument('--path', default='./../myfifo', help='pipe path')
+    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
+    
+
+except ImportError:
+    flags = None
+
+PIPE_PATH = ''
+uploaded_file_path = ''
+real_file_id = ''
+
+try:
+    import argparse
+
+    tools.argparser.add_argument('--fid', default='-1', help='real file_id')
+    tools.argparser.add_argument('--fpath', default='-1', help='uploaded file_path')
+    tools.argparser.add_argument('--fifo_path', default='./../myfifo', help='pipe path')
 
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
 
-    if flags.fname:
-        file_name = flags.fname
+    if flags.id:
+        real_file_id = flags.id
 
-    if flags.fifo:
-        PIPE_PATH = flags.fifo
+    if flags.fpath:
+        uploaded_file_path = flags.fpath
+
+    if flags.path:
+        PIPE_PATH = flags.path
+
 
 except ImportError:
     flags = None
@@ -85,28 +103,89 @@ def main():
         for item in first_folder_item:
             root_dir_id = item['id']
 
-    file_path = "./"
-    uploaded_id = file_upload(service, root_dir_id, file_path, file_name)
+    upload_request(service, "0B8CPvjgKUMvtaVpOWExmQ084LXc", "FOLDER_TEST", FOLDER_TYPE)
+    #file_upload(service, root_dir_id, real_file_path, uploaded_file_path)
 
     # 파일, 디렉토리 정보를 파일에 저장
     bridge = open(PIPE_PATH, "w")
     try:
-        bridge.write(uploaded_id + "\n")
+        for file in result_files:
+            bridge.write(file + "\n")
     finally:
         bridge.close()
 
+def upload_to_google_drive(service, root_dir_id, file_path, uploaded_file_path):
 
-def file_upload(service, root_dir_id, file_path, file_name):
+    ## Param: uploaded_file_path
+    ## ex) /folder1/folder2/folder3/aaa.txt
 
-    prev_path = [root_dir_id]
+    ## 1. 폴더패스, 파일이름 분리
+    ## ex) /folder1/folder2/folder3 AND aaa.txt
+    splited_path = uploaded_file_path.rsplit("/", 1)
+
+    directory_path = splited_path[0] # /aaa.txt이면 ""임
+    uploaded_file_name = splited_path[1]
+    
+
+    ## 2. 이미 폴더가 있는지 "myfifo" 탐색
+    ##  뒤에서부터 잘라가면서 해당 폴더가 있는지 확인한다.
+    ##  없는 폴더를 찾으면 거기서부터 역순으로 만들어 나감
+
+    ## ex) "myfifo"에 /folder1/ 가 이미 있는 경우
+    ##  /folder1/folder2/folder3 exist? NO
+    ##  /folder1/folder2 exist? NO
+    ##  /folder1 exist? YES
+    ##  make /folder1/folder2
+    ##  make /folder1/folder2/folder3
+    
+    depth = 0
+    parent = root_dir_id
+    no_exist_folers = ""
+
+    # 없애나가는 과정
+    while(directory_path):
+        ret = is_exist(directory_path)
+        if(ret):
+            parent = ret
+            break;
+        temp = directory_path.rsplit("/", 1)
+        directory_path = temp[0]
+        no_exist_folers = temp[1] + "/" + no_exist_folers 
+        depth += 1
+
+    while(depth):
+        upload_folder(service, parent, )
+
+        depth -= 1
+
+
+
+
+    ## 3. 파일 업로드
+    ##  upload /folder1/folder2/folder3/aaa.txt
+
+    real_file_path = ".../download/" + real_file_id
+    create_file(service, parent, uploaded_file_name, real_file_path)
+
+
+def upload_folder(service, parent, file_name):
     file_metadata = {
     'name' : file_name,
-    'parents' : prev_path }
+    'parents' : [parent],
+    'mimeType' : ROOT_FOLDER }
 
-    file_name = file_name;
-    file_full_path = file_path + file_name;
+    #media = MediaFileUpload('photo.jpg', mimetype='image/jpeg')
 
-    media = MediaFileUpload(file_full_path)
+    file = service.files().create(body=file_metadata,
+                                        fields='id').execute()
+    print('Folder Upload Success: %s' % file.get('id'))
+
+def create_file(service, parent, file_name, real_file_path):
+    file_metadata = {
+    'name' : file_name,
+    'parents' : [parent] }
+
+    media = MediaFileUpload(real_file_path)
     #media = MediaFileUpload('photo.jpg', mimetype='image/jpeg')
 
     file = service.files().create(body=file_metadata,
@@ -114,7 +193,6 @@ def file_upload(service, root_dir_id, file_path, file_name):
                                         fields='id').execute()
     print('File Upload Success: %s' % file.get('id'))
 
-    return file.get('id')
 
 if __name__ == '__main__':
     main()
