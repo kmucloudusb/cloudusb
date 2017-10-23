@@ -15,13 +15,8 @@ static struct cluster_info cluster_info[CLUSTER_INFO_FULL];
 //-----------------------------------------------------------------------------
 void fat_init()
 {
-    // Create boot record area
     create_reserved_area();
-    
-    // Create fat area
     create_fat_area();
-    
-    // Set root dir entry type
     set_root_dir_entry();
 }
 
@@ -151,10 +146,8 @@ void sync_with_cloud()
         
         printf("\n[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
         
-        // Search next empty cluster
         cluster = search_next_empty_cluster(cluster, fsize);
         
-        // Search next line first character
         offset = search_next_filelist_offset(filelist, offset);
     }
 }
@@ -167,21 +160,16 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
     puts("");
     
     while (is_valid_count(count)) {
-        // Reserved Area
         if (is_reserved_area(sector)) {
             memcpy(buffer + offset,
                    reserved_area + sector % FAT_RESERVED_AREA_BACKUP_POSITION * FAT_SECTOR_SIZE,
                    FAT_SECTOR_SIZE);
         }
-        
-        // Fat Area
         else if (is_fat_area(sector)) {
             memcpy(buffer + offset,
                    fat_area + ((sector - FAT_FAT_AREA_POSITION) % (FAT_ROOT_DIR_POSITION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE),
                    FAT_SECTOR_SIZE);
         }
-        
-        // Entries
         else if (is_entry_area(sector)) {
             unsigned int cluster =
             (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIR_FIRST_CLUSTER;
@@ -212,13 +200,11 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
            sector, (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER, count);
     
     while (is_valid_count(count)) {
-        // Fat Area
-        if (FAT_FAT_AREA_POSITION <= sector && sector < FAT_ROOT_DIR_POSITION) {
+        if (is_fat_area(sector)) {
             int pos = ((sector - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE);
             
             memcpy(fat_area + pos, buffer + offset, FAT_SECTOR_SIZE);
         }
-        
         // Entries
         else {
             int cluster = (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIR_FIRST_CLUSTER;
