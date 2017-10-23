@@ -98,8 +98,20 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
     }
 }
 
-void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize, int dir)
+void set_entry_filename(struct fat_dir_entry *entry, char *full_path)
 {
+    char path[FILE_NAME_FULL];
+    char filename[FILE_NAME_FULL];
+    char shortfilename[FAT_SFN_SIZE_FULL];
+    
+    fatfs_split_path(full_path, path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
+    fatfs_lfn_create_sfn(shortfilename, filename);
+    memcpy(entry->name, shortfilename, FAT_SFN_SIZE_FULL);
+}
+
+void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_path, char *fid, unsigned int fsize, int dir)
+{
+    set_entry_filename(entry, full_path);
     record_entry_first_cluster(entry, cluster);
     
     if (dir)
@@ -114,9 +126,6 @@ void sync_with_cloud()
     
     char filelist[PIPE_LEN_FULL] = {0};
     char full_path[PIPE_LEN_FULL];
-    char path[FILE_NAME_FULL];
-    char filename[FILE_NAME_FULL];
-    char shortfilename[FAT_SFN_SIZE_FULL];
     char fid[FILE_ID_FULL];
     
     struct fat_dir_entry entry = {0};
@@ -135,19 +144,13 @@ void sync_with_cloud()
         // Write on allocation table
         write_fat_area(cluster, fsize);
         
-        // Extract short file name for entry
-        fatfs_split_path(full_path, path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
-        fatfs_lfn_create_sfn(shortfilename, filename);
-        memcpy(entry.name, shortfilename, FAT_SFN_SIZE_FULL);
-        
-        set_dir_entry_info(&entry, cluster, fid, fsize, dir);
+        set_dir_entry_info(&entry, cluster, full_path, fid, fsize, dir);
         
         insert_dir_entry(cluster_info[FAT_ROOT_DIR_FIRST_CLUSTER].buffer, &entry);
         
         printf("\n[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
         
         cluster = search_next_empty_cluster(cluster, fsize);
-        
         offset = search_next_filelist_offset(filelist, offset);
     }
 }
