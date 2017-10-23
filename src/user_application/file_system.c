@@ -122,17 +122,16 @@ void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_pat
 
 void sync_with_cloud()
 {
+    int dir;
     int offset = 0;
+    unsigned int fsize;
+    int cluster = FAT_ROOT_DIR_FIRST_CLUSTER+1;
     
     char filelist[PIPE_LEN_FULL] = {0};
     char full_path[PIPE_LEN_FULL];
     char fid[FILE_ID_FULL];
     
     struct fat_dir_entry entry = {0};
-    
-    int dir;
-    unsigned int fsize;
-    int cluster = FAT_ROOT_DIR_FIRST_CLUSTER+1;
     
     // Receive information from Google Drive via pipe
     read_pipe(filelist);
@@ -188,7 +187,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         
         offset += FAT_SECTOR_SIZE;
         count --;
-        sector += 1;
+        sector ++;
     }
     
     return 1;
@@ -207,6 +206,10 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             int pos = ((sector - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE);
             
             memcpy(fat_area + pos, buffer + offset, FAT_SECTOR_SIZE);
+            
+            offset += FAT_SECTOR_SIZE;
+            count --;
+            sector ++;
         }
         // Entries
         else {
@@ -215,13 +218,12 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_SECTOR_SIZE);
             cluster_info[cluster].dirty = 1;
             
-            printf("((cluster %d is dirty))\n", cluster);
             clean_dirty_cluster();
+            
+            offset += FAT_CLUSTER_SIZE;
+            count -= FAT_SECTOR_PER_CLUSTER;
+            sector += FAT_SECTOR_PER_CLUSTER;
         }
-        
-        offset += FAT_SECTOR_SIZE;
-        count --;
-        sector ++;
     }
     
     for (i=0; i<512; i++) {
