@@ -22,6 +22,9 @@ enum B_MESSAGE_ID {
     REQU_DEL_DRIVE_AUTH, RESP_DEL_DRIVE_AUTH
 };
 
+// FAIL은 사용자가 입력한 WIFI SSID, PW가 잘못 입력 되었을 경우 (외부적 요인) 
+// ERROR는 파일 열기 실패 등등 시스템에서 문제가 있을 경우 (내부적 요인)
+
 enum RESPONSE_STATE {
     RESULT_OK,
     RESULT_FAIL,
