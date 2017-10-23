@@ -3,18 +3,18 @@
 ## 기능(구현 10%)
 구글 드라이브에 파일을 업로드한다.
 
-../download 폴더에 있는 파일 이름이 fid인 파일을 구름USB 루트디렉토리에 업로드한다.(개선 필요)
-게다가 현재는 구글 드라이브 내에 저장되는 이름도 fid임
+../upload(current) 폴더에 있는 파일 이름이 fname인 파일을 구름USB 루트디렉토리에 업로드한다.(개선 필요)
+그리고 fifo에 해당 파일의 구글 드라이브 fid를 쓴다.
 
 ## 사용
 
 ```
-$ python upload.py --fid FILE_ID
+$ python upload.py --fname FILE_ID --fifo FIFO_PATH
 ```
 
 ## 예제
 ```
-$ python upload.py --fid 0B8CPvjgKUMvtWVVtY3ZKLWNTb2M
+$ python upload.py --fname 0B8CPvjgKUMvtWVVtY3ZKLWNTb2M --fifo ../myfifo
 ```
 
 file_id가 "0B8CPvjgKUMvtWVVtY3ZKLWNTb2M" 인 파일을 업로드한다.
