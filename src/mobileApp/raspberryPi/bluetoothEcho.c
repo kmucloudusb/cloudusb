@@ -37,7 +37,7 @@ typedef struct {
 
 char user_auth_list[MAX_USER_NUM][PARAM_BUF_LEN];
 int num_user = 0;
-
+int wifi_on = 0;
 
 int _str2uuid( const char *uuid_str, uuid_t *uuid ) {
     /* This is from the pybluez stack */
@@ -296,8 +296,9 @@ int get_wifi_ssid(char *ssid){
     fgets(cmd_return, 1024, cmd_fp);
     strcpy(ssid, cmd_return);
     len = (int)strlen(ssid);
-    ssid[len-1] = '\0';
-
+    if(len > 0){
+	ssid[len-1] = '\0';
+    }
     pclose(cmd_fp);
 
     return 0;
@@ -322,6 +323,7 @@ int request_get_wifi_info(BMessage *request, BMessage *response){
     printf("\request_get_wifi_info(): RESULT_OK [%s]\n", ssid);
     response->state = RESULT_OK;
     strcpy(response->param1, ssid); 
+    wifi_on = 1;
     return 0;
 }
 /* =================================== */
@@ -356,6 +358,7 @@ int request_set_wifi(BMessage *request, BMessage *response){
     
     strcpy(response->param1, ssid);	
     response->state = RESULT_OK;
+    wifi_on = 1;
 	return 0;
 }
 /* =================================== */
@@ -775,10 +778,24 @@ void write_server(int client, char *message) {
         printf("sent [%s] %d\n", messageArr, bytes_sent);
     }
 }
+char *init_wifi(){
+    char localInput[PARAM_BUF_LEN] = { 0 };
+    char response[PARAM_BUF_LEN] = { 0 };
+
+    sprintf(input, "%d$%d$ $ $", REQU_GET_WIFI_INFO, RESULT_OK);
+    operate_message(input, response);
+    strcpy(input, response);
+    return input;
+}
 
 int main()
 {
     int client = init_server();
+
+    char *init_message = init_wifi();
+    write_server(client, init_message);
+    if( wifi_on == 1)
+	return 0;    
 
     while(1)
     {
@@ -789,5 +806,7 @@ int main()
         }
 
         write_server(client, recv_message);
+	if( wifi_on == 1)
+	    break;	
     }
 }
