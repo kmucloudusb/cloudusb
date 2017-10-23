@@ -115,7 +115,7 @@ void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *fid, uns
 
 void sync_with_cloud()
 {
-    int offset = 1;
+    int offset = 0;
     
     char filelist[PIPE_LEN_FULL] = {0};
     char full_path[PIPE_LEN_FULL];
@@ -128,12 +128,12 @@ void sync_with_cloud()
     
     int dir;
     unsigned int fsize;
-    int cluster = FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
+    int cluster = FAT_ROOT_DIRECTORY_FIRST_CLUSTER+1;
     
     // Receive information from Google Drive via pipe
     read_pipe(filelist);
     
-    while(!is_end_of_filelist(filelist, offset-1))
+    while(!is_end_of_filelist(filelist, offset))
     {
         sscanf(filelist+offset, "%512s %u %s %d", full_path, &fsize, fid, &dir);
         
@@ -429,7 +429,7 @@ void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
         filename[fn_no++] = entry->name[i];
     }
     
-    filename[fn_no] = NULL;
+    filename[fn_no] = '\0';
 }
 
 int fatfs_total_path_levels(char *path)
