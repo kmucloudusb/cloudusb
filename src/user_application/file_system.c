@@ -32,12 +32,12 @@ int is_reserved_area(unsigned int sector)
 
 int is_fat_area(unsigned int sector)
 {
-    return ( (FAT_FAT_AREA_POSITION <= sector) && (sector < FAT_ROOT_DIR_POSITION) );
+    return ( (sector >= FAT_FAT_AREA_POSITION) && (sector < FAT_ROOT_DIR_POSITION) );
 }
 
 int is_entry_area(unsigned int sector)
 {
-    return ( (FAT_ROOT_DIR_POSITION <= sector) && (sector < (FAT_ROOT_DIR_POSITION + CLUSTER_INFO_FULL)) );
+    return ( (sector >= FAT_ROOT_DIR_POSITION) && (sector < (FAT_ROOT_DIR_POSITION + CLUSTER_INFO_FULL)) );
 }
 
 int is_valid_count(unsigned int count)
