@@ -12,10 +12,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define ATTR_EMPTY 0
 #define ATTR_FILE 1
 #define ATTR_DIR 2
-#define ATTR_ELSE 3
 
 #define PIPE_LEN_FULL 4096
 #define CMD_LEN_FULL 1024
@@ -56,7 +54,7 @@ struct cluster_info
     int attr;
     int dirty;
     int cluster_no;
-
+    
     char filename[FILE_NAME_FULL];
     unsigned char buffer[FAT_CLUSTER_SIZE];
 };
