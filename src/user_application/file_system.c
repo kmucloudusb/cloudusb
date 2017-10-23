@@ -42,7 +42,7 @@ int is_entry_area(unsigned int sector)
 
 int is_valid_count(unsigned int count)
 {
-    return ( (count != 0) && (count <= 32) );
+    return ( (count != 0) && (count <= FAT_BUFF_LEN_FULL) );
 }
 
 int is_end_of_filelist(char *filelist, int offset)
@@ -128,7 +128,7 @@ void sync_with_cloud()
     
     int dir;
     unsigned int fsize;
-    int cluster = 3;
+    int cluster = FAT_ENTRY_FIRST_CLUSTER;
     
     // Receive information from Google Drive via pipe
     read_pipe(filelist);
@@ -344,13 +344,13 @@ void write_fat_area(int cluster, unsigned int size)
     while (1) {
         cluster_info[cluster].cluster_no = cluster_no++;
         
-        if (size > 4096) {
+        if (size > FAT_CLUSTER_SIZE) {
             fat_area[loc++] = (unsigned char)((++cluster) & 0xFF);
             fat_area[loc++] = (unsigned char)(((cluster) & 0xFF00) >> 8);
             fat_area[loc++] = (unsigned char)(((cluster) & 0xFF0000) >> 16);
             fat_area[loc++] = (unsigned char)(((cluster) & 0xFF000000) >> 24);
             
-            size -= 4096;
+            size -= FAT_CLUSTER_SIZE;
         }
         else {
             fat_area[loc++] = 0xFF;
@@ -368,7 +368,7 @@ int insert_dir_entry(unsigned char *rootdir_entry, struct fat_dir_entry *entry)
     int i;
     
     for (i=0; i<ENTRY_PER_CLUSTER; i+=FAT_DIR_ENTRY_SIZE) {
-        if (rootdir_entry[i] == 0x00 || rootdir_entry[i] == 0xE5) {
+        if (rootdir_entry[i] == ENTRY_EMPTY || rootdir_entry[i] == ENTRY_REMOVED) {
             memcpy(rootdir_entry + i, entry, sizeof(struct fat_dir_entry));
             
             return 1;

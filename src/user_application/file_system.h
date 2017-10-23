@@ -21,6 +21,7 @@
 #define FILE_NAME_FULL 512
 #define FILE_ID_FULL 512
 
+#define ENTRY_EMPTY 0x00
 #define ENTRY_DIR 0x10
 #define ENTRY_FILE 0x20
 #define ENTRY_REMOVED 0xE5
@@ -48,6 +49,7 @@
 #define FAT_CLUSTER_CHAIN_MARKER_LEN 4
 #define FAT_CLUSTER_CHAIN_EMPTY 0x00
 #define FAT_END_OF_CLUSTER_CHAIN_MARKER 0xF0FFFF0F
+#define FAT_BUFF_LEN_FULL 32
 
 struct cluster_info
 {
