@@ -19,7 +19,6 @@ try:
     import argparse
 
     tools.argparser.add_argument('--path', default='./../myfifo', help='pipe path')
-
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
 
     if flags.path:
