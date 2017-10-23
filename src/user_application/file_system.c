@@ -172,10 +172,6 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             memcpy(buffer + offset,
                    reserved_area + sector % FAT_RESERVED_AREA_BACKUP_POSITION * FAT_SECTOR_SIZE,
                    FAT_SECTOR_SIZE);
-            
-            offset += FAT_SECTOR_SIZE;
-            count --;
-            sector += 1;
         }
         
         // Fat Area
@@ -183,10 +179,6 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             memcpy(buffer + offset,
                    fat_area + ((sector - FAT_FAT_AREA_POSITION) % (FAT_ROOT_DIR_POSITION - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE),
                    FAT_SECTOR_SIZE);
-            
-            offset += FAT_SECTOR_SIZE;
-            count --;
-            sector += 1;
         }
         
         // Entries
@@ -194,22 +186,18 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             unsigned int cluster =
             (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
             
-            memcpy(buffer + offset, cluster_info[cluster].buffer, FAT_CLUSTER_SIZE);
-            
-            offset += FAT_CLUSTER_SIZE;
-            count -= FAT_SECTOR_PER_CLUSTER;
-            sector += FAT_SECTOR_PER_CLUSTER;
+            memcpy(buffer + offset, cluster_info[cluster].buffer, FAT_SECTOR_SIZE);
             
             clean_dirty_cluster();
         }
         // Meaning less
         else {
             memset(buffer + offset, 0x00, FAT_SECTOR_SIZE);
-            
-            offset += FAT_SECTOR_SIZE;
-            count --;
-            sector += 1;
         }
+        
+        offset += FAT_SECTOR_SIZE;
+        count --;
+        sector += 1;
     }
     
     return 1;
@@ -229,26 +217,22 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             int pos = ((sector - FAT_FAT_AREA_POSITION) * FAT_SECTOR_SIZE);
             
             memcpy(fat_area + pos, buffer + offset, FAT_SECTOR_SIZE);
-            
-            offset += FAT_SECTOR_SIZE;
-            count --;
-            sector ++;
         }
         
         // Entries
         else {
             int cluster = (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIRECTORY_FIRST_CLUSTER;
             
-            memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_CLUSTER_SIZE);
+            memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_SECTOR_SIZE);
             cluster_info[cluster].dirty = 1;
             
             printf("((cluster %d is dirty))\n", cluster);
             clean_dirty_cluster();
-            
-            offset += FAT_CLUSTER_SIZE;
-            count -= FAT_SECTOR_PER_CLUSTER;
-            sector += FAT_SECTOR_PER_CLUSTER;
         }
+        
+        offset += FAT_SECTOR_SIZE;
+        count --;
+        sector ++;
     }
     
     for (i=0; i<512; i++) {
