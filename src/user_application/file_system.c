@@ -3,6 +3,7 @@
 static char *path_list = "/home/pi/cloudusb/src/googledrive/list/list.py";
 static char *path_downloader = "/home/pi/cloudusb/src/googledrive/download/download.py";
 static char *path_uploader = "/home/pi/cloudusb/src/googledrive/upload/upload.py";
+static char *path_remover = "/home/pi/cloudusb/src/googledrive/delete/delete.py";
 static char *path_pipe = "/home/pi/cloudusb/bin/myfifo";
 
 static unsigned char reserved_area[FAT_SECTOR_SIZE];
@@ -638,6 +639,18 @@ void upload_file(char *filename)
     strcat(cmd, filename);
     strcat(cmd, " --fifo ");
     strcat(cmd, path_pipe);
+    
+    system(cmd);
+}
+
+void remove_file(char *fid)
+{
+    printf("[Delete] %s\n", fid);
+    char cmd[CMD_LEN_FULL] = "python ";
+    
+    strncat(cmd, path_remover, strlen(path_remover));
+    strcat(cmd, " --fid ");
+    strcat(cmd, fid);
     
     system(cmd);
 }
