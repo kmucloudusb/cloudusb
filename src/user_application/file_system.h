@@ -55,6 +55,7 @@ struct cluster_info
     int dirty;
     int cluster_no;
     
+    char fid[FILE_ID_FULL];
     char filename[FILE_NAME_FULL];
     unsigned char buffer[FAT_CLUSTER_SIZE];
 };
@@ -88,7 +89,8 @@ int search_next_filelist_offset(char *filelist, int offset);
 void record_entry_first_cluster(struct fat_dir_entry *entry, int cluster);
 void record_entry_dir(struct fat_dir_entry *entry, int cluster);
 void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize);
-void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize, int dir);
+void set_entry_filename(struct fat_dir_entry *entry, char *filename);
+void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_path, char *fid, unsigned int fsize, int dir);
 
 void fat_init();
 void sync_with_cloud();
@@ -120,6 +122,7 @@ void upload_file(char *filename);
 void download_metadata();
 void read_pipe(char *buffer);
 void download_file(char *fid);
+void remove_file(char *fid);
 
 //-----------------------------------------------------------------------------
 // Fixed Area Creation Functions
