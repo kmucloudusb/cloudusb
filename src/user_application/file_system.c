@@ -634,8 +634,10 @@ void upload_file(char *filename)
     char cmd[CMD_LEN_FULL] = "python ";
     
     strncat(cmd, path_uploader, strlen(path_uploader));
-    strcat(cmd, " --fid ");
+    strcat(cmd, " --fname ");
     strcat(cmd, filename);
+    strcat(cmd, " --fifo ");
+    strcat(cmd, path_pipe);
     
     system(cmd);
 }
