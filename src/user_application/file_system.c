@@ -84,7 +84,7 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
     
     download_file(fid);
     
-    if ( ((fd = open(fid, O_RDONLY)) >= 0) ) {
+    if ( ((fd = open(cluster_info[cluster].filename, O_RDONLY)) >= 0) ) {
         for (i = cluster;
              i < (cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0)));
              i++)
@@ -92,28 +92,32 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
             cluster_info[i].attr = ATTR_FILE;
             cluster_info[i].cluster_no = i - cluster;
             read(fd, cluster_info[cluster].buffer, FAT_CLUSTER_SIZE);
-            strcpy(cluster_info[i].filename, fid);
+            strcpy(cluster_info[i].fid, fid);
         }
         
         close(fd);
     }
 }
 
-void set_entry_filename(struct fat_dir_entry *entry, char *full_path)
+void set_entry_filename(struct fat_dir_entry *entry, char *filename)
 {
-    char path[FILE_NAME_FULL];
-    char filename[FILE_NAME_FULL];
     char shortfilename[FAT_SFN_SIZE_FULL];
     
-    fatfs_split_path(full_path, path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
     fatfs_lfn_create_sfn(shortfilename, filename);
+    
     memcpy(entry->name, shortfilename, FAT_SFN_SIZE_FULL);
 }
 
 void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_path, char *fid, unsigned int fsize, int dir)
 {
-    set_entry_filename(entry, full_path);
+    char path[FILE_NAME_FULL];
+    char filename[FILE_NAME_FULL];
+    
+    fatfs_split_path(full_path, path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
+    set_entry_filename(entry, filename);
     record_entry_first_cluster(entry, cluster);
+    
+    strcpy(cluster_info[cluster].filename, filename);
     
     if (dir)
         record_entry_dir(entry, cluster);
@@ -294,6 +298,10 @@ void record_entry_info(unsigned char *entry)
             if (cluster_info[cluster].dirty) {
                 upload_file(cluster_info[cluster].filename);
                 cluster_info[cluster].dirty = 0;
+                
+                char fid[PIPE_LEN_FULL];
+                read_pipe(fid);
+                strcpy(cluster_info[cluster].fid, fid);
             }
         }
         else if (item->attr == FAT_ENTRY_DIR) {
