@@ -282,7 +282,7 @@ void record_entry_info(unsigned char *entry)
         
         if (item->attr == FAT_ENTRY_FILE) {
             if (item->name[0] == FAT_ENTRY_REMOVED && cluster_info[cluster].dirty) {
-                // Need to add remove file function
+                remove_file(cluster_info[cluster].fid);
                 cluster_info[cluster].dirty = 0;
                 
                 continue;
