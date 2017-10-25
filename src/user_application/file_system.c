@@ -46,6 +46,13 @@ int is_end_of_filelist(char *filelist, int offset)
     return ( (filelist[offset] == '\0') || (filelist[offset+1] == '\0') );
 }
 
+int is_system_file(char *filename)
+{
+    int len = (int) strlen(filename);
+    
+    return (filename[len-3] == 's' && filename[len-2] == 'w' && filename[len-1] == 'p');
+}
+
 int search_next_empty_cluster(int cluster, unsigned int fsize)
 {
     if (fsize == 0)
@@ -296,12 +303,15 @@ void record_entry_info(unsigned char *entry)
             write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
             
             if (cluster_info[cluster].dirty) {
-                upload_file(cluster_info[cluster].filename);
-                cluster_info[cluster].dirty = 0;
+                if (!is_system_file(cluster_info[cluster].filename)) {
+                    upload_file(cluster_info[cluster].filename);
+                    
+                    char fid[PIPE_LEN_FULL];
+                    read_pipe(fid);
+                    strcpy(cluster_info[cluster].fid, fid);
+                }
                 
-                char fid[PIPE_LEN_FULL];
-                read_pipe(fid);
-                strcpy(cluster_info[cluster].fid, fid);
+                cluster_info[cluster].dirty = 0;
             }
         }
         else if (item->attr == FAT_ENTRY_DIR) {
