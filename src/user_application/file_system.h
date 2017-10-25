@@ -114,6 +114,7 @@ int fatfs_total_path_levels(char *path);
 int fatfs_get_substring(char *path, int levelreq, char *output, int max_len);
 int fatfs_split_path(char *full_path, char *path, int max_path, char *filename, int max_filename);
 int fatfs_lfn_create_sfn(char *sfn_output, char *filename);
+void convert_to_lowercase(char *filename);
 
 //-----------------------------------------------------------------------------
 // Cloud Storage Related Functions

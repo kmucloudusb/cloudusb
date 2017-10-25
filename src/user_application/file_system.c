@@ -430,6 +430,8 @@ void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
     }
     
     filename[fn_no] = '\0';
+    
+    convert_to_lowercase(filename);
 }
 
 int fatfs_total_path_levels(char *path)
@@ -600,6 +602,16 @@ int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
     }
     
     return 1;
+}
+
+void convert_to_lowercase(char *filename)
+{
+    int len = (int) strlen(filename);
+    
+    for (int i=0; i<len; i++) {
+        if (filename[i] >= 'A' && filename[i] <= 'Z')
+            filename[i] += 'a' + 'A';
+    }
 }
 
 //-----------------------------------------------------------------------------
