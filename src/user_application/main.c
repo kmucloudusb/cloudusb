@@ -10,7 +10,7 @@ int main()
     download_metadata();
 
     // Make allocation table
-    write_entries();
+    sync_with_cloud();
 
     run_module();
 }

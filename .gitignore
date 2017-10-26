@@ -6,7 +6,7 @@
 
 # Security file #
 # google API secret data #
-client_secret.json
+client_secret.*
 
 # MAC system file
 .DS_Store
@@ -14,3 +14,6 @@ client_secret.json
 
 # Real Files
 **/cloud_usb_test/
+
+# Temp Files
+myfifo
