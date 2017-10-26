@@ -1,11 +1,8 @@
 #include "connModule.h"
 
 volatile int cloud_flag = WAIT_HOST;
-
-
 struct read_export *reads;
 struct write_export *writes;
-
 
 /* for block request */
 struct request *req;
@@ -35,6 +32,7 @@ int cloud_release(struct inode *inode, struct file *filp) {
 
 long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
+    int ret = 0;
     printk(KERN_ALERT "CloudUSB_con ioctl called\n");
     switch (cmd)
     {
@@ -82,7 +80,7 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
             printk(KERN_ALERT "CloudUSB_con ioctl get FILE_WRITE_OVER\n");
     }
     cloud_flag = WAIT_HOST;
-    printk(KERN_ALERT "CloudUSB wait next block request.\n");
+    printk(KERN_ALERT "CloudUSB_con wait next block request.\n");
     
     /* wait because of context problem, no race condition */
     while(cloud_flag==WAIT_HOST){schedule_timeout_uninterruptible(0.001*HZ);}
@@ -91,24 +89,32 @@ long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     printk(KERN_ALERT "CloudUSB_con receive block request(after wait)\n");
     
     if(cloud_flag == EXECUTE_READ)
-        perform_read(req, &read_info, t);
+        ret = perform_read(req, &read_info, t);
     else
-        perform_write(req, &write_info, t);
+        ret = perform_write(req, &write_info, t);
     
+    if (ret < 0){
+        printk("CloudUSB_con sending signal error\n");
+        return ret;
+    }
     return 0;
 }
 
-void perform_read(struct request *req, struct siginfo *info, struct task_struct *t){
+int perform_read(struct request *req, struct siginfo *info, struct task_struct *t){
+    int ret = 0;
     printk(KERN_ALERT "CloudUSB_con request read_file_offset: %lld\n", req->read_file_offset);
     printk(KERN_ALERT "CloudUSB_con request read_amount: %u\n", req->read_amount);
     
     req->read_file_offset = reads->read_file_offset;
     req->read_amount = reads->read_amount;
     
-    send_sig_info(SIGUSR1, info, t);
+    ret = send_sig_info(SIGUSR1, info, t);
+    
+    return ret;
 }
 
-void perform_write(struct request *req, struct siginfo *info, struct task_struct *t){
+int perform_write(struct request *req, struct siginfo *info, struct task_struct *t){
+    int ret = 0;
     printk(KERN_ALERT "CloudUSB_con request write_file_offset: %lld\n", writes->write_file_offset);
     printk(KERN_ALERT "CloudUSB_con request write_amount: %u\n", writes->write_amount);
     printk(KERN_ALERT "CloudUSB_con received write_buff: %x\n", writes->write_buff);
@@ -129,7 +135,9 @@ void perform_write(struct request *req, struct siginfo *info, struct task_struct
     }
     printk(KERN_ALERT "\n");
     
-    send_sig_info(SIGUSR2, info, t);
+    ret = send_sig_info(SIGUSR2, info, t);
+    
+    return ret;
 }
 
 /*-------------------------------------------------------------------------*/

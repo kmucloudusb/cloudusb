@@ -57,8 +57,8 @@ struct return_file{
     int nread;
 };
 
-void perform_read(struct request *req, struct siginfo *info, struct task_struct *t);
-void perform_write(struct request *req, struct siginfo *info, struct task_struct *t);
+int perform_read(struct request *req, struct siginfo *info, struct task_struct *t);
+int perform_write(struct request *req, struct siginfo *info, struct task_struct *t);
 
 static int cloud_open(struct inode *inode, struct file *file);
 static long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
