@@ -704,7 +704,6 @@ int search_available_wifi(char* wifi_names){
     }
     fgets(cmd_return, 1024, cmd_fp);
     strcpy(wifi_names, cmd_return);
-    len = (int)strlen(ssid);
     pclose(cmd_fp);
 
     return 0;
