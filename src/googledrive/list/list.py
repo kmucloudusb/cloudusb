@@ -103,6 +103,7 @@ def main():
         
 def listing_files(folder_id, directory, result_files, all_files):
 
+    # 파일이 하나도 없는 경우
     if not all_files:
         return        
 
