@@ -69,6 +69,8 @@ def main():
 
     file_delete(service, file_id)
 
+    
+
 def file_delete(service, file_id):
     file = service.files().delete(fileId=file_id).execute()
     print('File Delete Success: %s' % file_id)
