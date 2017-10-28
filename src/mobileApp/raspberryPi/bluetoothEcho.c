@@ -187,7 +187,7 @@ sdp_session_t *register_service(uint8_t rfcomm_channel) {
 
     return session;
 }
-
+/* ======================================== */
 
 int init_server() {
     int port = 3, result, sock, client, bytes_read, bytes_sent;
@@ -297,12 +297,8 @@ int get_wifi_ssid(char *ssid){
         perror("cmd_fp: popen() Fail");
         return -1;
     }
-    fgets(cmd_return, 1024, cmd_fp);
+    fscanf(cmd_fp, "%s", cmd_return);
     strcpy(ssid, cmd_return);
-    len = (int)strlen(ssid);
-    if(len > 0){
-	ssid[len-1] = '\0';
-    }
     pclose(cmd_fp);
 
     return 0;
@@ -692,6 +688,23 @@ int request_del_drive_auth(BMessage *request, BMessage *response){
 
 
 /* =================================== */
+int parse_string(char *str, char *origin){
+	printf("parse origin: %s\n", origin);
+	int index = 0;
+	int new_index = 0;
+	while(origin[index]!='"'){
+		index++;
+	}
+	index++;
+	while(origin[index]!='"'){
+		str[new_index] = origin[index];
+		index++;
+		new_index++;
+	}
+	str[new_index] = '\0';
+	printf("parse new: %s\n", str);
+	return 0;
+}
 int search_available_wifi(char* wifi_names){
     FILE *cmd_fp;
     char cmd_return[PARAM_BUF_LEN] = {0};
@@ -703,8 +716,13 @@ int search_available_wifi(char* wifi_names){
         perror("cmd_fp: popen() Fail");
         return -1;
     }
-    fgets(cmd_return, 1024, cmd_fp);
-    strcpy(wifi_names, cmd_return);
+    while(fgets(cmd_return, PARAM_BUF_LEN, cmd_fp)){
+	    char ssid[PARAM_BUF_LEN] = {0};
+	    parse_string(ssid, cmd_return);
+	    strcat(wifi_names, ssid); 
+	    strcat(wifi_names, "@");
+    } 
+    printf("wifi names: %s\n", wifi_names);
     pclose(cmd_fp);
 
     return 0;
