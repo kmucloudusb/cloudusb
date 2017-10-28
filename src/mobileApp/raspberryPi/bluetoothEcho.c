@@ -776,6 +776,10 @@ int operate_message(char *command, char *response){
             ret = request_del_drive_auth(&requ_message, &resp_message);
             break;
 
+        case REQU_AVAILABLE_WIFI_NAMES:
+            ret = requset_availabe_wifi_names(&requ_message, &resp_message);
+            break;
+
         default:
             break;
     }
