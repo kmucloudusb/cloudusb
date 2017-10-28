@@ -697,6 +697,7 @@ int search_available_wifi(char* wifi_names){
     char cmd_return[PARAM_BUF_LEN] = {0};
     int len;
 
+    system("sudo ifup wlan0");
     cmd_fp = popen("sudo iwlist wlan0 scan | grep ESSID", "r");
     if(cmd_fp == NULL){
         perror("cmd_fp: popen() Fail");
