@@ -15,24 +15,50 @@
 #include <linux/sched.h>
 #include <linux/rcupdate.h>
 #include <linux/delay.h>
-
-/* ioctl command */
-#define INIT 0
-#define RETURN_FILE 1
-#define FILE_WRITE_OVER 2
+#include <linux/slab.h>
 
 MODULE_LICENSE("GPL");
 
-struct module_init{
+/* ioctl command */
+#define INIT _IOW('a', 0, struct request)
+#define RETURN_FILE _IOW('a', 1, struct return_file)
+#define FILE_WRITE_OVER _IO('a', 2)
+
+/* Read & Write flag */
+#define WAIT_HOST 0
+#define EXECUTE_READ 1
+#define EXECUTE_WRITE 2
+
+struct request{
     int pid;
-    unsigned int amount;
-    loff_t file_offset;
+    unsigned int read_amount;
+    unsigned int write_amount;
+    loff_t read_file_offset;
+    loff_t write_file_offset;
+    char *write_buff;
+};
+
+struct read_export{
+    unsigned int read_amount;
+    char __user *read_buff;
+    loff_t read_file_offset;
+    ssize_t	nread;
+};
+
+struct write_export{
+    unsigned int write_amount;
+    char __user *write_buff;
+    loff_t write_file_offset;
+    ssize_t nwritten;
 };
 
 struct return_file{
-    unsigned char *buf;
+    unsigned char *buff;
     int nread;
 };
+
+void perform_read(struct request *req, struct siginfo *info, struct task_struct *t);
+void perform_write(struct request *req, struct siginfo *info, struct task_struct *t);
 
 static int cloud_open(struct inode *inode, struct file *file);
 static long cloud_ioctl(struct file *file, unsigned int cmd, unsigned long arg);

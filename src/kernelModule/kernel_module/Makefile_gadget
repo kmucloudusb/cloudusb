@@ -1,7 +1,11 @@
 #
 # USB peripheral controller drivers
 #
+<<<<<<< HEAD
 KBUILD_EXTRA_SYMBOLS := /home/pi/cloudusb/src/kernelModule/connect_module/Mo    dule.symvers 
+=======
+KBUILD_EXTRA_SYMBOLS := /home/pi/cloudusb/src/kernelModule/connect_module/Module.symvers
+>>>>>>> fat_write
 
 subdir-ccflags-$(CONFIG_USB_GADGET_DEBUG)	:= -DDEBUG
 subdir-ccflags-$(CONFIG_USB_GADGET_VERBOSE)	+= -DVERBOSE_DEBUG
