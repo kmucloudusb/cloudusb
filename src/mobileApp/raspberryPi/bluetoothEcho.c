@@ -281,6 +281,7 @@ int set_wifi(char *ssid, char *pw){
 
     fclose(wpa_fp);
     system("sudo ifdown wlan0");
+    sleep(1);
     system("sudo ifup wlan0");
 
     return 0;
@@ -861,8 +862,8 @@ int main()
 
     char *init_message = init_wifi();
     write_server(client, init_message);
-    if( wifi_on == 1)
-	return 0;    
+   // if( wifi_on == 1)
+//	return 0;    
 
     while(1)
     {
@@ -873,7 +874,7 @@ int main()
         }
 
         write_server(client, recv_message);
-	if( wifi_on == 1)
-	    break;	
+//	if( wifi_on == 1)
+//	    break;	
     }
 }
