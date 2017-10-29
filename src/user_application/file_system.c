@@ -85,13 +85,18 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
 {
     int i;
     int fd;
+    char cmd[CMD_LEN_FULL] = "mv ";
     
     entry->attr = FAT_ENTRY_FILE;
     entry->size = fsize;
     
     download_file(fid);
+    strcat(cmd, fid);
+    strcat(cmd, " ");
+    strcat(cmd, cluster_info[cluster].filename);
+    system(cmd);
     
-    if ( ((fd = open(fid, O_RDONLY)) >= 0) ) {
+    if ( ((fd = open(cluster_info[cluster].filename, O_RDONLY)) >= 0) ) {
         for (i = cluster;
              i < (cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0)));
              i++)
