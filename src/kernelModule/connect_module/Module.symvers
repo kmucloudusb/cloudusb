@@ -1,7 +1,0 @@
-0x34dd7c38	file_offset	/home/pi/cloudusb/src/kernelModule/connect_module/connModule	EXPORT_SYMBOL
-0x0841e080	cloud_flag	/home/pi/cloudusb/src/kernelModule/connect_module/connModule	EXPORT_SYMBOL
-0x85af292e	writes	/home/pi/cloudusb/src/kernelModule/connect_module/connModule	EXPORT_SYMBOL
-0xccf359ef	amount	/home/pi/cloudusb/src/kernelModule/connect_module/connModule	EXPORT_SYMBOL
-0x40e9a5bd	buff	/home/pi/cloudusb/src/kernelModule/connect_module/connModule	EXPORT_SYMBOL
-0xbf6e4048	reads	/home/pi/cloudusb/src/kernelModule/connect_module/connModule	EXPORT_SYMBOL
-0x5e62887a	nread	/home/pi/cloudusb/src/kernelModule/connect_module/connModule	EXPORT_SYMBOL
