@@ -1,7 +1,6 @@
 package com.example.jinheesang.bluetoothtest;
 /*
  *
- * webnautes@naver.com
  *
  * 참고
  * https://github.com/googlesamples/android-BluetoothChat
@@ -12,7 +11,6 @@ package com.example.jinheesang.bluetoothtest;
         import java.io.InputStream;
         import java.io.OutputStream;
         import java.util.Set;
-        import java.util.StringTokenizer;
         import java.util.UUID;
 
         import android.bluetooth.BluetoothAdapter;
@@ -28,18 +26,36 @@ package com.example.jinheesang.bluetoothtest;
         import android.view.View;
         import android.widget.ArrayAdapter;
         import android.widget.Button;
-        import android.widget.EditText;
         import android.widget.ListView;
         import android.widget.TextView;
+        import android.widget.Toast;
+
 
 
 public class MainActivity extends AppCompatActivity
 {
+    enum B_MESSAGE_ID {
+        MESG_NONE, MESG_ERROR,
+        REQU_GET_WIFI_INFO, RESP_GET_WIFI_INFO,
+        REQU_SET_WIFI, RESP_SET_WIFI,
+        REQU_SET_CLIENT_SECRET, RESP_SET_CLIENT_SECRET,
+        REQU_GET_USERS_LIST, RESP_GET_USERS_LIST,
+        REQU_ADD_DRIVE_AUTH, RESP_ADD_DRIVE_AUTH,
+        REQU_CHANGE_DRIVE_AUTH, RESP_CHANGE_DRIVE_AUTH,
+        REQU_DEL_DRIVE_AUTH, RESP_DEL_DRIVE_AUTH,
+        REQU_AVAILABLE_WIFI_NAMES, RESP_AVAILABLE_WIFI_NAMES
+    }
+
+    enum B_RESPONSE_STATE {
+        RESULT_OK,
+        RESULT_FAIL,
+        RESULT_ERROR
+    }
+
     private final int REQUEST_BLUETOOTH_ENABLE = 100;
+    private final int REQUEST_WIFI_SETTING = 101;
 
     private TextView mConnectionStatus;
-    private EditText mInputEditText;
-    private EditText mInputEditText2;
     private TextView mSsidStatus;
     private TextView mWifiStatus;
 
@@ -50,28 +66,113 @@ public class MainActivity extends AppCompatActivity
     static boolean isConnectionError = false;
     private static final String TAG = "BluetoothClient";
 
+    // BMessage Class
+    private class BMessage{
+        private int id = B_MESSAGE_ID.MESG_NONE.ordinal();
+        private int state = B_RESPONSE_STATE.RESULT_FAIL.ordinal();
+        private String param1 = " ";
+        private String param2 = " ";
+
+        // Send Message
+        BMessage(B_MESSAGE_ID id, B_RESPONSE_STATE state, String param1, String param2){
+            this.id = id.ordinal();
+            this.state = state.ordinal();
+            this.param1 = param1;
+            this.param2 = param2;
+        }
+
+        private boolean sendMsg(){
+            String msgString = id + "$" + state + "$" + param1 + "$" + param2 + "$";
+            sendMessage(msgString);
+            return true;
+        }
+
+        // Request Message
+        BMessage(String requset){
+            String[] parsed = requset.split("\\$", 4);
+            Log.d( TAG, parsed[0]);
+            Log.d( TAG, parsed[1]);
+            Log.d( TAG, parsed[2]);
+            Log.d( TAG, parsed[3]);
+
+            id = Integer.parseInt(parsed[0]);
+            state = Integer.parseInt(parsed[1]);
+            param1 = parsed[2];
+            param2 = parsed[3];
+        }
+
+        private boolean execute(){
+
+            switch (B_MESSAGE_ID.values()[id]){
+                case RESP_SET_WIFI:
+                case RESP_GET_WIFI_INFO:
+                    responseGetWifiInfo();
+                    break;
+
+                case RESP_AVAILABLE_WIFI_NAMES:
+                    responseAvailableWifiNames();
+                    break;
+
+                default:
+                    ;
+            }
+            return true;
+        }
+
+        private boolean responseGetWifiInfo(){
+            String ssid = param1;
+
+            if(state == B_RESPONSE_STATE.RESULT_OK.ordinal()){
+                mWifiStatus.setText("Connected");
+                mSsidStatus.setText("SSID: " + ssid);
+                Toast.makeText(getApplication(), "WIFI: connected", Toast.LENGTH_SHORT).show();
+
+                return true;
+            }
+            else{
+                mWifiStatus.setText("Fail");
+                mSsidStatus.setText(" ");
+                Toast.makeText(getApplication(), "WIFI: failed" , Toast.LENGTH_SHORT).show();
+
+                return false;
+            }
+
+        }
+
+        private boolean responseAvailableWifiNames(){
+            String wifi_names = param1;
+            if(state == B_RESPONSE_STATE.RESULT_OK.ordinal()){
+                Intent wifi_intent = new Intent(MainActivity.this, WifiActivity.class);
+                wifi_intent.putExtra("status", mWifiStatus.getText().toString());
+                wifi_intent.putExtra("ssid", mSsidStatus.getText().toString());
+                wifi_intent.putExtra("wifi_names", wifi_names);
+                startActivityForResult(wifi_intent, REQUEST_WIFI_SETTING);
+
+                return true;
+            }
+            return false;
+        }
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Button sendButton = (Button)findViewById(R.id.send_button);
-        sendButton.setOnClickListener(new View.OnClickListener(){
+        Button wifiButton = (Button)findViewById(R.id.btn_wifi);
+        wifiButton.setOnClickListener(new View.OnClickListener(){
             public void onClick(View v){
-                String sendMessage = mInputEditText.getText().toString();
-                String sendMessage2 = mInputEditText2.getText().toString();
+                BMessage message = new BMessage(
+                        B_MESSAGE_ID.REQU_AVAILABLE_WIFI_NAMES,
+                        B_RESPONSE_STATE.RESULT_OK,
+                        " ", " "
+                );
+                message.sendMsg();
 
-                sendMessage = sendMessage.replaceAll(" ","");
-                sendMessage2 = sendMessage2.replaceAll(" ","");
-                if ( sendMessage.length() > 0 && sendMessage2.length() > 0) {
-                    sendMessage(sendMessage, sendMessage2);
-                }
             }
         });
         mConnectionStatus = (TextView)findViewById(R.id.connection_status_textview);
-        mInputEditText = (EditText)findViewById(R.id.input_string_edittext);
-        mInputEditText2 = (EditText)findViewById(R.id.input_string_edittext2);
         mSsidStatus = (TextView)findViewById(R.id.current_ssid);
         mWifiStatus = (TextView)findViewById(R.id.wifi_status);
         ListView mMessageListview = (ListView) findViewById(R.id.message_listview);
@@ -100,6 +201,7 @@ public class MainActivity extends AppCompatActivity
             //3. 목록에서 블루투스 장치를 선택하면 선택한 디바이스를 인자로 하여
             //   doConnect 함수가 호출됩니다.
             showPairedDevicesListDialog();
+
         }
     }
 
@@ -188,6 +290,16 @@ public class MainActivity extends AppCompatActivity
         mConnectedTask.execute();
     }
 
+    private Boolean firstMessage(){
+        BMessage message = new BMessage(
+                B_MESSAGE_ID.REQU_GET_WIFI_INFO,
+                B_RESPONSE_STATE.RESULT_OK,
+                " "," "
+        );
+
+        message.sendMsg();
+        return true;
+    }
 
     /**
      * This thread runs during a connection with a remote device.
@@ -209,10 +321,11 @@ public class MainActivity extends AppCompatActivity
                 Log.e(TAG, "socket not created", e );
             }
 
-            Log.d( TAG, "connected to "+mConnectedDeviceName);
-            mConnectionStatus.setText( "connected to "+mConnectedDeviceName);
-        }
+            Log.d(TAG, "connected to " + mConnectedDeviceName);
+            mConnectionStatus.setText("connected to " + mConnectedDeviceName);
 
+            Toast.makeText(getApplication(), "Bluetooth: connected" , Toast.LENGTH_SHORT).show();
+        }
 
 
 
@@ -221,14 +334,17 @@ public class MainActivity extends AppCompatActivity
 
             byte [] readBuffer = new byte[1024];
             int readBufferPosition = 0;
-
             // Keep listening to the InputStream while connected
             while (true) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
 
                 if ( isCancelled() ) return false;
 
                 try {
-
                     int bytesAvailable = mInputStream.available();
 
                     if(bytesAvailable > 0) {
@@ -267,24 +383,16 @@ public class MainActivity extends AppCompatActivity
 
         }
 
+
         @Override
         protected void onProgressUpdate(String... recvMessage) {
-
             mConversationArrayAdapter.insert(mConnectedDeviceName + ": " + recvMessage[0], 0);
 
             String str;
             str = recvMessage[0];
-            StringTokenizer s = new StringTokenizer(str);
-            s.nextToken("$");
-            String retSsidStatus = s.nextToken("$");
-            if(retSsidStatus.equals("True")){
-                mWifiStatus.setText("Connected");
-                mSsidStatus.setText(s.nextToken("$"));
-            }
-            else {
-                mWifiStatus.setText("Fail");
-                mSsidStatus.setText("");
-            }
+
+            BMessage message = new BMessage(str);
+            message.execute();
         }
 
 
@@ -324,20 +432,17 @@ public class MainActivity extends AppCompatActivity
             }
         }
 
-        void write(String msg,String msg2){
+        void write(String msg){
 
-            String fullMsg = "OPTEST" + "$" + msg + "$" + msg2 +"$";
-            fullMsg += "\n";
+            msg+= "\n";
 
             try {
-                mOutputStream.write(fullMsg.getBytes());
+                mOutputStream.write(msg.getBytes());
                 mOutputStream.flush();
             } catch (IOException e) {
                 Log.e(TAG, "Exception during send", e );
             }
 
-            mInputEditText.setText(" ");
-            mInputEditText2.setText(" ");
         }
     }
 
@@ -413,12 +518,12 @@ public class MainActivity extends AppCompatActivity
         builder.create().show();
     }
 
-    void sendMessage(String msg, String msg2){
+    void sendMessage(String msg){
 
         if ( mConnectedTask != null ) {
-            mConnectedTask.write(msg, msg2);
-            Log.d(TAG, "send message: " + msg + "/" + msg2);
-            mConversationArrayAdapter.insert("Me:  " + msg + "/" + msg2, 0);
+            mConnectedTask.write(msg);
+            Log.d(TAG, "send message: " + msg);
+            mConversationArrayAdapter.insert("Me:  " + msg, 0);
         }
     }
 
@@ -431,8 +536,22 @@ public class MainActivity extends AppCompatActivity
                 //BlueTooth is now Enabled
                 showPairedDevicesListDialog();
             }
-            if(resultCode == RESULT_CANCELED){
+            if( resultCode == RESULT_CANCELED){
                 showQuitDialog( "You need to enable bluetooth");
+            }
+        }
+        else if(requestCode == REQUEST_WIFI_SETTING){
+            if (resultCode == RESULT_OK){
+                BMessage message = new BMessage(
+                        B_MESSAGE_ID.REQU_SET_WIFI,
+                        B_RESPONSE_STATE.RESULT_OK,
+                        data.getStringExtra("ssid"),
+                        data.getStringExtra("pw")
+                );
+
+                mWifiStatus.setText("Waiting...");
+                mSsidStatus.setText(" ");
+                message.sendMsg();
             }
         }
     }
