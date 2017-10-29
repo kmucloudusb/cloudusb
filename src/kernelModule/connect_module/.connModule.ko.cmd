@@ -1,0 +1,1 @@
+cmd_/home/pi/cloudusb/src/kernelModule/connect_module/connModule.ko := ld -EL -r  -T ./scripts/module-common.lds --build-id  -o /home/pi/cloudusb/src/kernelModule/connect_module/connModule.ko /home/pi/cloudusb/src/kernelModule/connect_module/connModule.o /home/pi/cloudusb/src/kernelModule/connect_module/connModule.mod.o

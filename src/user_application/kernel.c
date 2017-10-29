@@ -38,6 +38,7 @@ void run_module()
     }
 
     printf("STRUCT ADDRESS : %p\n", &inits);
+    system("sh /home/pi/cloudusb/bin/load_module.sh &");
 
     if(ioctl(module_fd, INIT, &inits) < 0)
         printf("Error in IOCTL1 errno: %d\n", errno);
