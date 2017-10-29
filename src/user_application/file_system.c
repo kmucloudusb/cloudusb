@@ -91,7 +91,7 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
     
     download_file(fid);
     
-    if ( ((fd = open(cluster_info[cluster].filename, O_RDONLY)) >= 0) ) {
+    if ( ((fd = open(fid, O_RDONLY)) >= 0) ) {
         for (i = cluster;
              i < (cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0)));
              i++)
@@ -288,11 +288,12 @@ void record_entry_info(unsigned char *entry)
         unsigned int cluster = get_cluster_from_entry(item);
         
         if (item->attr == FAT_ENTRY_FILE) {
-            if (item->name[0] == FAT_ENTRY_REMOVED && cluster_info[cluster].dirty) {
-                remove_file(cluster_info[cluster].fid);
-                cluster_info[cluster].dirty = 0;
+            if (item->name[0] == FAT_ENTRY_REMOVED) {
+                if (cluster_info[cluster].status == CLUSTER_REMOVED)
+                    continue;
                 
-                continue;
+                remove_file(cluster_info[cluster].fid);
+                cluster_info[cluster].status = CLUSTER_REMOVED;
             }
             
             strcpy(filename, cluster_info[cluster].filename);
@@ -616,11 +617,12 @@ int fatfs_lfn_create_sfn(char *sfn_output, char *filename)
 
 void convert_to_lowercase(char *filename)
 {
+    int i;
     int len = (int) strlen(filename);
     
-    for (int i=0; i<len; i++) {
+    for (i=0; i<len; i++) {
         if (filename[i] >= 'A' && filename[i] <= 'Z')
-            filename[i] += 'a' + 'A';
+            filename[i] += 'a' - 'A';
     }
 }
 
