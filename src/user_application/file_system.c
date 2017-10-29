@@ -228,7 +228,7 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             int cluster = (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIR_FIRST_CLUSTER;
             
             memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_SECTOR_SIZE);
-            cluster_info[cluster].dirty = 1;
+            cluster_info[cluster].status = CLUSTER_DIRTY;
             
             clean_dirty_cluster();
             
@@ -303,7 +303,7 @@ void record_entry_info(unsigned char *entry)
             
             write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
             
-            if (cluster_info[cluster].dirty) {
+            if (cluster_info[cluster].status == CLUSTER_DIRTY) {
                 if (!is_system_file(cluster_info[cluster].filename)) {
                     upload_file(cluster_info[cluster].filename);
                     
@@ -312,7 +312,7 @@ void record_entry_info(unsigned char *entry)
                     strcpy(cluster_info[cluster].fid, fid);
                 }
                 
-                cluster_info[cluster].dirty = 0;
+                cluster_info[cluster].status = CLUSTER_CLEAN;
             }
         }
         else if (item->attr == FAT_ENTRY_DIR) {

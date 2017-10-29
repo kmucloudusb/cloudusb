@@ -12,6 +12,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#define CLUSTER_CLEAN 0
+#define CLUSTER_DIRTY 1
+#define CLUSTER_REMOVED 2
+
 #define ATTR_FILE 1
 #define ATTR_DIR 2
 
@@ -52,7 +56,7 @@
 struct cluster_info
 {
     int attr;
-    int dirty;
+    int status;
     int cluster_no;
     
     char fid[FILE_ID_FULL];
