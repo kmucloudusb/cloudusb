@@ -19,8 +19,12 @@ enum B_MESSAGE_ID {
     REQU_GET_USERS_LIST, RESP_GET_USERS_LIST,
     REQU_ADD_DRIVE_AUTH, RESP_ADD_DRIVE_AUTH,
     REQU_CHANGE_DRIVE_AUTH, RESP_CHANGE_DRIVE_AUTH,
-    REQU_DEL_DRIVE_AUTH, RESP_DEL_DRIVE_AUTH
+    REQU_DEL_DRIVE_AUTH, RESP_DEL_DRIVE_AUTH,
+    REQU_AVAILABLE_WIFI_NAMES, RESP_AVAILABLE_WIFI_NAMES
 };
+
+// FAIL은 사용자가 입력한 WIFI SSID, PW가 잘못 입력 되었을 경우 (외부적 요인) 
+// ERROR는 파일 열기 실패 등등 시스템에서 문제가 있을 경우 (내부적 요인)
 
 enum RESPONSE_STATE {
     RESULT_OK,
@@ -183,7 +187,7 @@ sdp_session_t *register_service(uint8_t rfcomm_channel) {
 
     return session;
 }
-
+/* ======================================== */
 
 int init_server() {
     int port = 3, result, sock, client, bytes_read, bytes_sent;
@@ -277,6 +281,7 @@ int set_wifi(char *ssid, char *pw){
 
     fclose(wpa_fp);
     system("sudo ifdown wlan0");
+    sleep(1);
     system("sudo ifup wlan0");
 
     return 0;
@@ -293,12 +298,8 @@ int get_wifi_ssid(char *ssid){
         perror("cmd_fp: popen() Fail");
         return -1;
     }
-    fgets(cmd_return, 1024, cmd_fp);
+    fscanf(cmd_fp, "%s", cmd_return);
     strcpy(ssid, cmd_return);
-    len = (int)strlen(ssid);
-    if(len > 0){
-	ssid[len-1] = '\0';
-    }
     pclose(cmd_fp);
 
     return 0;
@@ -682,7 +683,70 @@ int request_del_drive_auth(BMessage *request, BMessage *response){
     strcpy(response->param1, account_nickname);
     strcpy(response->param2, users);
     response->state = RESULT_OK;
+
+    return 0;
 }
+
+
+/* =================================== */
+int parse_string(char *str, char *origin){
+	printf("parse origin: %s\n", origin);
+	int index = 0;
+	int new_index = 0;
+	while(origin[index]!='"'){
+		index++;
+	}
+	index++;
+	while(origin[index]!='"'){
+		str[new_index] = origin[index];
+		index++;
+		new_index++;
+	}
+	str[new_index] = '\0';
+	printf("parse new: %s\n", str);
+	return 0;
+}
+int search_available_wifi(char* wifi_names){
+    FILE *cmd_fp;
+    char cmd_return[PARAM_BUF_LEN] = {0};
+    int len;
+
+    system("sudo ifup wlan0");
+    cmd_fp = popen("sudo iwlist wlan0 scan | grep ESSID", "r");
+    if(cmd_fp == NULL){
+        perror("cmd_fp: popen() Fail");
+        return -1;
+    }
+    while(fgets(cmd_return, PARAM_BUF_LEN, cmd_fp)){
+	    char ssid[PARAM_BUF_LEN] = {0};
+	    parse_string(ssid, cmd_return);
+	    strcat(wifi_names, ssid); 
+	    strcat(wifi_names, "@");
+    } 
+    printf("wifi names: %s\n", wifi_names);
+    pclose(cmd_fp);
+
+    return 0;
+}
+
+
+int requset_availabe_wifi_names(BMessage *request, BMessage *response){
+    int ret;
+    char wifi_names[PARAM_BUF_LEN] = {0};
+
+    response->id = RESP_AVAILABLE_WIFI_NAMES;
+    ret = search_available_wifi(wifi_names);
+    if(ret < 0){
+        return -1;
+    }
+
+    printf("\requset_availabe_wifi_names(): RESULT_OK");
+    strcpy(response->param1, wifi_names);
+    response->state = RESULT_OK;
+
+    return 0;
+}
+
 
 
 /* =================================== */
@@ -729,6 +793,10 @@ int operate_message(char *command, char *response){
 
         case REQU_DEL_DRIVE_AUTH:
             ret = request_del_drive_auth(&requ_message, &resp_message);
+            break;
+
+        case REQU_AVAILABLE_WIFI_NAMES:
+            ret = requset_availabe_wifi_names(&requ_message, &resp_message);
             break;
 
         default:
@@ -794,8 +862,8 @@ int main()
 
     char *init_message = init_wifi();
     write_server(client, init_message);
-    if( wifi_on == 1)
-	return 0;    
+   // if( wifi_on == 1)
+//	return 0;    
 
     while(1)
     {
@@ -806,7 +874,7 @@ int main()
         }
 
         write_server(client, recv_message);
-	if( wifi_on == 1)
-	    break;	
+//	if( wifi_on == 1)
+//	    break;	
     }
 }

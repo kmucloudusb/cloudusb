@@ -14,7 +14,7 @@ from apiclient.http import MediaIoBaseDownload
 from apiclient.http import MediaFileUpload
 
 file_name = ''
-PIPE_PATH= ''
+pipe_path= ''
 
 try:
     import argparse
@@ -28,7 +28,7 @@ try:
         file_name = flags.fname
 
     if flags.fifo:
-        PIPE_PATH = flags.fifo
+        pipe_path = flags.fifo
 
 except ImportError:
     flags = None
@@ -86,12 +86,10 @@ def main():
             root_dir_id = item['id']
 
     file_path = "./"
-
-    # file_upload(service, root_dir_id, file_path, file_id)
     uploaded_id = file_upload(service, root_dir_id, file_path, file_name)
 
     # 파일, 디렉토리 정보를 파일에 저장
-    bridge = open(PIPE_PATH, "w")
+    bridge = open(pipe_path, "w")
     try:
         bridge.write(uploaded_id + "\n")
     finally:

@@ -19,7 +19,6 @@ try:
     import argparse
 
     tools.argparser.add_argument('--path', default='./../myfifo', help='pipe path')
-
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
 
     if flags.path:
@@ -104,6 +103,7 @@ def main():
         
 def listing_files(folder_id, directory, result_files, all_files):
 
+    # 파일이 하나도 없는 경우
     if not all_files:
         return        
 
