@@ -33,7 +33,7 @@ int is_fat_area(unsigned int sector)
 
 int is_entry_area(unsigned int sector)
 {
-    return ( (sector >= FAT_ROOT_DIR_POSITION) && (sector < (FAT_ROOT_DIR_POSITION + CLUSTER_INFO_FULL)) );
+    return ( (sector >= FAT_ROOT_DIR_POSITION) && (sector < (FAT_ROOT_DIR_POSITION + CLUSTER_INFO_FULL*FAT_SECTOR_PER_CLUSTER)) );
 }
 
 int is_valid_count(unsigned int count)
@@ -57,7 +57,7 @@ int search_next_empty_cluster(int cluster, unsigned int fsize)
 {
     if (fsize == 0)
         return cluster + 1;
-    return ( cluster + (fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0) );
+    return ( cluster + (fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0) + 1 );
 }
 
 int search_next_filelist_offset(char *filelist, int offset)
@@ -103,7 +103,7 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
         {
             cluster_info[i].attr = ATTR_FILE;
             cluster_info[i].cluster_no = i - cluster;
-            read(fd, cluster_info[cluster].buffer, FAT_CLUSTER_SIZE);
+            read(fd, cluster_info[i].buffer, FAT_CLUSTER_SIZE);
             strcpy(cluster_info[i].fid, fid);
         }
         
@@ -164,8 +164,6 @@ void sync_with_cloud()
         
         insert_dir_entry(cluster_info[FAT_ROOT_DIR_FIRST_CLUSTER].buffer, &entry);
         
-        printf("\n[Written Data]\n filename = %s\n attr = %d\n", cluster_info[cluster].filename, cluster_info[cluster].attr);
-        
         cluster = search_next_empty_cluster(cluster, fsize);
         offset = search_next_filelist_offset(filelist, offset);
     }
@@ -175,8 +173,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
     unsigned int offset = 0;
     
-    printf("[read] sector = %u\n", sector);
-    puts("");
+    printf("\n[read] sector = %u\n", sector);
     
     while (is_valid_count(count)) {
         if (is_reserved_area(sector)) {
@@ -193,7 +190,7 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
             unsigned int cluster =
             (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIR_FIRST_CLUSTER;
             
-            memcpy(buffer + offset, cluster_info[cluster].buffer, FAT_SECTOR_SIZE);
+            memcpy(buffer + offset, cluster_info[cluster].buffer + (offset%FAT_CLUSTER_SIZE), FAT_SECTOR_SIZE);
             
             clean_dirty_cluster();
         }
@@ -212,11 +209,9 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 
 int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
-    int i;
     unsigned int offset = 0;
     
-    printf("\n[wrtie] sector = %u cluster = %u size = %u\n",
-           sector, (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER, count);
+    printf("\n[write] sector = %u\n", sector);
     
     while (is_valid_count(count)) {
         if (is_fat_area(sector)) {
@@ -230,9 +225,9 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         }
         // Entries
         else {
-            int cluster = (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIR_FIRST_CLUSTER;
+            int cluster = ( (sector - FAT_ROOT_DIR_POSITION) / FAT_SECTOR_PER_CLUSTER + FAT_ROOT_DIR_FIRST_CLUSTER );
             
-            memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_SECTOR_SIZE);
+            memcpy(cluster_info[cluster].buffer, buffer + offset, FAT_CLUSTER_SIZE);
             cluster_info[cluster].status = CLUSTER_DIRTY;
             
             clean_dirty_cluster();
@@ -243,13 +238,6 @@ int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
         }
     }
     
-    for (i=0; i<512; i++) {
-        if (i != 0 && i % 16 == 0)
-            puts("");
-        printf("%02X ", buffer[i]);
-    }
-    puts("");
-    
     return 1;
 }
 
@@ -258,7 +246,6 @@ void record_cluster_no()
     int i;
     int count = 0;
     unsigned int cluster_chain_info;
-    puts("[record cluster no]");
     
     for (i=FAT_ROOT_DIR_FIRST_CLUSTER*FAT_CLUSTER_CHAIN_MARKER_LEN;
          i<CLUSTER_INFO_FULL;
@@ -301,7 +288,7 @@ void record_entry_info(unsigned char *entry)
                 cluster_info[cluster].status = CLUSTER_REMOVED;
             }
             
-            strcpy(filename, cluster_info[cluster].filename);
+            //            strcpy(filename, cluster_info[cluster].filename);
             
             cluster_info[cluster].attr = ATTR_FILE;
             get_filename_from_entry(item, cluster_info[cluster].filename);
@@ -396,12 +383,6 @@ unsigned int get_cluster_from_entry(struct fat_dir_entry *entry)
 
 int write_file(char *filename, unsigned char *buffer, int cluster_no)
 {
-    int i;
-    printf("[write pysically] %s\n", filename);
-    for (i=0; i<16; i++)
-        printf("0x%02X, ", buffer[i]);
-    puts("");
-    
     int fd = open(filename, O_RDWR | O_CREAT | O_EXCL, 0644);
     
     if (errno == ENOENT)
