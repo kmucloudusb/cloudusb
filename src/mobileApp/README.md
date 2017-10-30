@@ -4,6 +4,7 @@
 와이파이 변경 및 상태 확인
 
 <img src="./images/app_wifi.jpeg" alt="APP_WIFI" width="250">
+<img src="./images/wifi_setting.jpeg" alt="WIFI_SETTING" width="250">
 
 ### 실행흐름
 
