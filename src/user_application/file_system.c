@@ -33,7 +33,7 @@ int is_fat_area(unsigned int sector)
 
 int is_entry_area(unsigned int sector)
 {
-    return ( (sector >= FAT_ROOT_DIR_POSITION) && (sector < (FAT_ROOT_DIR_POSITION + CLUSTER_INFO_FULL)) );
+    return ( (sector >= FAT_ROOT_DIR_POSITION) && (sector < (FAT_ROOT_DIR_POSITION + CLUSTER_INFO_FULL*FAT_SECTOR_PER_CLUSTER)) );
 }
 
 int is_valid_count(unsigned int count)
@@ -57,7 +57,7 @@ int search_next_empty_cluster(int cluster, unsigned int fsize)
 {
     if (fsize == 0)
         return cluster + 1;
-    return ( cluster + (fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0) );
+    return ( cluster + (fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0) + 1 );
 }
 
 int search_next_filelist_offset(char *filelist, int offset)
@@ -103,10 +103,10 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
         {
             cluster_info[i].attr = ATTR_FILE;
             cluster_info[i].cluster_no = i - cluster;
-            read(fd, cluster_info[cluster].buffer, FAT_CLUSTER_SIZE);
+            read(fd, cluster_info[i].buffer, FAT_CLUSTER_SIZE);
             strcpy(cluster_info[i].fid, fid);
         }
-        
+
         close(fd);
     }
 }
