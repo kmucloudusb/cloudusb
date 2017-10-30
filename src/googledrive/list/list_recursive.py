@@ -92,11 +92,6 @@ def main():
     listing_files(service, root_dir_id, "", result_files, result_directories)
     del result_directories[0]
 
-
-    # sorted_result_directories = result_files
-    # sorted_result_files= sorted(result_files, reverse=False, key=metaDataListsortKey)
-
-
     # 3. 탐색한 파일, 디렉토리 정보를 보여줌
     for file in result_files:
         print(file)
