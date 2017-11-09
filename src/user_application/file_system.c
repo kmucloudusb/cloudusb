@@ -96,11 +96,9 @@ void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsi
     strcat(cmd, cluster_info[cluster].filename);
     system(cmd);
     
+    int no_endcluster = cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0));
     if ( ((fd = open(cluster_info[cluster].filename, O_RDONLY)) >= 0) ) {
-        for (i = cluster;
-             i < (cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0)));
-             i++)
-        {
+        for (i = cluster; i < no_endcluster; i++) {
             cluster_info[i].attr = ATTR_FILE;
             cluster_info[i].cluster_no = i - cluster;
             read(fd, cluster_info[i].buffer, FAT_CLUSTER_SIZE);
