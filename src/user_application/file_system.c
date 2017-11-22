@@ -173,8 +173,6 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
     unsigned int offset = 0;
     
-    printf("\n[read] sector = %u\n", sector);
-    
     while (is_valid_count(count)) {
         if (is_reserved_area(sector)) {
             memcpy(buffer + offset,
@@ -210,8 +208,6 @@ int read_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 int write_media(unsigned int sector, unsigned char *buffer, unsigned int count)
 {
     unsigned int offset = 0;
-    
-    printf("\n[write] sector = %u\n", sector);
     
     while (is_valid_count(count)) {
         if (is_fat_area(sector)) {
