@@ -15,6 +15,13 @@ from apiclient.http import MediaIoBaseDownload
 Kbyte = 1024
 
 file_id = ''
+pipe_path= './../myfifo'
+
+def enum(**enums):
+    return type('Enum', (), enums)
+RET_STATE = enum(SUCCESS=1, UNKWON_ERROR=2, NETWORK_ERROR=3, 
+    OAUTH2_ERROR=4, NOT_EXIST_FILE_IN_CLOUD=5, NOT_EXIST_FILE_IN_LOCAL=6)
+return_state = RET_STATE.SUCCESS
 
 try:
     import argparse
@@ -79,6 +86,13 @@ def main():
 
     partial_download(service, file_id, byte_begin, byte_end, directory)
 
+    # 파일, 디렉토리 정보를 파일에 저장
+    bridge = open(pipe_path, "w")
+    try:
+        bridge.write(return_state + "\n")
+    finally:
+        bridge.close()
+
 
 def partial_download(service, file_id, byte_begin, byte_end, directory):
     # Metadata
@@ -115,6 +129,9 @@ def replace_cache(file_size):
     st = os.statvfs('/')
     du = (st.f_bavail * st.f_frsize) / Kbyte
     print(du)
+
+
+
 
 if __name__ == '__main__':
     main()
