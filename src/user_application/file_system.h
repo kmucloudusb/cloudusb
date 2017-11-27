@@ -25,6 +25,13 @@
 #define FILE_NAME_FULL 512
 #define FILE_ID_FULL 512
 
+#define OK 0
+#define ERROR_UNIDENTIFIED 1
+#define ERROR_NETWORK 2
+#define ERROR_OATH 3
+#define ERROR_NO_FILE_LOCAL 4
+#define ERROR_NO_FILE_REMOTE 5
+
 #define FAT_ENTRY_EMPTY 0x00
 #define FAT_ENTRY_DIR 0x10
 #define FAT_ENTRY_FILE 0x20
