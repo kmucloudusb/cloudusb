@@ -130,13 +130,13 @@ void convert_to_lowercase(char *filename);
 //-----------------------------------------------------------------------------
 // Cloud Storage Related Functions
 //-----------------------------------------------------------------------------
-void upload_file(char *filename);
-void download_metadata();
+int upload_file(char *filename);
+int download_metadata();
 void read_pipe(char *buffer);
-void download_file(char *fid);
-void remove_file(char *fid);
+int download_file(char *fid);
+int remove_file(char *fid);
 int read_response_code();
-void show_response_msg(int response_code);
+void get_error_msg(int error_code);
 
 //-----------------------------------------------------------------------------
 // Fixed Area Creation Functions

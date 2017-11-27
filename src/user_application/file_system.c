@@ -611,7 +611,7 @@ void convert_to_lowercase(char *filename)
 //-----------------------------------------------------------------------------
 // Cloud Storage Related Functions
 //-----------------------------------------------------------------------------
-void download_metadata()
+int download_metadata()
 {
     char cmd[CMD_LEN_FULL] = "python ";
     strcat(cmd, path_list);
@@ -619,6 +619,8 @@ void download_metadata()
     strcat(cmd, path_pipe);
     
     system(cmd);
+    
+    return read_response_code();
 }
 
 void read_pipe(char *buffer)
@@ -631,7 +633,7 @@ void read_pipe(char *buffer)
     close(fd);
 }
 
-void download_file(char *fid)
+int download_file(char *fid)
 {
     printf("[download] %s\n", fid);
     
@@ -641,9 +643,11 @@ void download_file(char *fid)
     strcat(cmd, fid);
     
     system(cmd);
+    
+    return read_response_code();
 }
 
-void upload_file(char *filename)
+int upload_file(char *filename)
 {
     printf("[upload] %s\n", filename);
     char cmd[CMD_LEN_FULL] = "python ";
@@ -655,9 +659,11 @@ void upload_file(char *filename)
     strcat(cmd, path_pipe);
     
     system(cmd);
+    
+    return read_response_code();
 }
 
-void remove_file(char *fid)
+int remove_file(char *fid)
 {
     printf("[Delete] %s\n", fid);
     char cmd[CMD_LEN_FULL] = "python ";
@@ -667,6 +673,8 @@ void remove_file(char *fid)
     strcat(cmd, fid);
     
     system(cmd);
+    
+    return read_response_code();
 }
 
 int read_response_code()
