@@ -669,6 +669,36 @@ void remove_file(char *fid)
     system(cmd);
 }
 
+int read_response_code()
+{
+    char buffer[PIPE_LEN_FULL];
+    read_pipe(buffer);
+    
+    int res;
+    sscanf(buffer, "%d", &res);
+    
+    return res;
+}
+
+void show_response_msg(int response_code)
+{
+    switch(response_code)
+    {
+        case OK:
+            puts("OK..."); break;
+        case ERROR_UNIDENTIFIED:
+            puts("Unexpected Error..."); break;
+        case ERROR_NETWORK:
+            puts("Cannot Access Network..."); break;
+        case ERROR_OATH:
+            puts("Authentication Cannot Be Verified"); break;
+        case ERROR_NO_FILE_LOCAL:
+            puts("Cannot Find File From USB..."); break;
+        case ERROR_NO_FILE_REMOTE:
+            puts("Cannot Find File From Cloud..."); break;
+    }
+}
+
 //-----------------------------------------------------------------------------
 // Fixed Area Creation Functions
 //-----------------------------------------------------------------------------
