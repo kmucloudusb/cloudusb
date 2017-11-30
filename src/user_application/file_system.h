@@ -26,11 +26,12 @@
 #define FILE_ID_FULL 512
 
 #define OK 0
-#define ERROR_UNIDENTIFIED 1
-#define ERROR_NETWORK 2
-#define ERROR_OATH 3
-#define ERROR_NO_FILE_LOCAL 4
-#define ERROR_NO_FILE_REMOTE 5
+#define ERROR_UNIDENTIFIED -1
+#define ERROR_NETWORK -2
+#define ERROR_OATH -3
+#define ERROR_NO_FILE_LOCAL -4
+#define ERROR_NO_FILE_REMOTE -5
+#define ERROR_CLUSTER_OUT_OF_BOUND -6
 
 #define FAT_ENTRY_EMPTY 0x00
 #define FAT_ENTRY_DIR 0x10
@@ -98,10 +99,10 @@ int is_end_of_filelist(char *filelist, int offset);
 int search_next_empty_cluster(int cluster, unsigned int fsize);
 int search_next_filelist_offset(char *filelist, int offset);
 void record_entry_first_cluster(struct fat_dir_entry *entry, int cluster);
-void record_entry_dir(struct fat_dir_entry *entry, int cluster);
-void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize);
-void set_entry_filename(struct fat_dir_entry *entry, char *filename);
-void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_path, char *fid, unsigned int fsize, int dir);
+int record_entry_dir(struct fat_dir_entry *entry, int cluster);
+int record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize);
+void record_entry_filename(struct fat_dir_entry *entry, char *filename);
+int record_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_path, char *fid, unsigned int fsize, int dir);
 
 void fat_init();
 void sync_with_cloud();
@@ -120,7 +121,7 @@ int write_file(char *filename, unsigned char *buffer, int cluster_no);
 //-----------------------------------------------------------------------------
 // String Processing Functions
 //-----------------------------------------------------------------------------
-void get_filename_from_entry(struct fat_dir_entry *entry, char *filename);
+void extract_filename_from_entry(struct fat_dir_entry *entry, char *filename);
 int fatfs_total_path_levels(char *path);
 int fatfs_get_substring(char *path, int levelreq, char *output, int max_len);
 int fatfs_split_path(char *full_path, char *path, int max_path, char *filename, int max_filename);
@@ -136,7 +137,7 @@ void read_pipe(char *buffer);
 int download_file(char *fid);
 int remove_file(char *fid);
 int read_response_code();
-void get_error_msg(int error_code);
+void show_response_msg(int error_code);
 
 //-----------------------------------------------------------------------------
 // Fixed Area Creation Functions
