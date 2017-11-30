@@ -122,7 +122,7 @@ int record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsig
     return res_code;
 }
 
-void set_entry_filename(struct fat_dir_entry *entry, char *filename)
+void record_entry_filename(struct fat_dir_entry *entry, char *filename)
 {
     char shortfilename[FAT_SFN_SIZE_FULL];
     
@@ -131,13 +131,14 @@ void set_entry_filename(struct fat_dir_entry *entry, char *filename)
     memcpy(entry->name, shortfilename, FAT_SFN_SIZE_FULL);
 }
 
-void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_path, char *fid, unsigned int fsize, int dir)
+int record_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_path, char *fid, unsigned int fsize,
+                          int dir)
 {
     char path[FILE_NAME_FULL];
     char filename[FILE_NAME_FULL];
     
     fatfs_split_path(full_path, path, FILE_NAME_FULL, filename, FILE_NAME_FULL);
-    set_entry_filename(entry, filename);
+    record_entry_filename(entry, filename);
     record_entry_first_cluster(entry, cluster);
     
     strcpy(cluster_info[cluster].filename, filename);
@@ -295,7 +296,7 @@ void record_entry_info(unsigned char *entry)
             //            strcpy(filename, cluster_info[cluster].filename);
             
             cluster_info[cluster].attr = ATTR_FILE;
-            get_filename_from_entry(item, cluster_info[cluster].filename);
+            extract_filename_from_entry(item, cluster_info[cluster].filename);
             
             write_file(cluster_info[cluster].filename, cluster_info[cluster].buffer, 0);
             
@@ -409,7 +410,7 @@ int write_file(char *filename, unsigned char *buffer, int cluster_no)
 //-----------------------------------------------------------------------------
 // String Processing Functions
 //-----------------------------------------------------------------------------
-void get_filename_from_entry(struct fat_dir_entry *entry, char *filename)
+void extract_filename_from_entry(struct fat_dir_entry *entry, char *filename)
 {
     int i, j;
     char fn_no = 0;
