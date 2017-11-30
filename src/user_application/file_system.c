@@ -73,42 +73,53 @@ void record_entry_first_cluster(struct fat_dir_entry *entry, int cluster)
     entry->first_cluster_low = (unsigned short) cluster;
 }
 
-void record_entry_dir(struct fat_dir_entry *entry, int cluster)
+int record_entry_dir(struct fat_dir_entry *entry, int cluster)
 {
-    entry->attr = FAT_ENTRY_DIR;
-    entry->size = 0;
-    
-    cluster_info[cluster].attr = ATTR_DIR;
+    if (cluster < CLUSTER_INFO_FULL) {
+        entry->attr = FAT_ENTRY_DIR;
+        entry->size = 0;
+        
+        cluster_info[cluster].attr = ATTR_DIR;
+        
+        return OK;
+    }
+    return ERROR_CLUSTER_OUT_OF_BOUND;
 }
 
-void record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize)
+int record_entry_file(struct fat_dir_entry *entry, int cluster, char *fid, unsigned int fsize)
 {
-    int i;
-    int fd;
-    char cmd[CMD_LEN_FULL] = "mv ";
+    int res_code;
     
-    entry->attr = FAT_ENTRY_FILE;
-    entry->size = fsize;
-    
-    download_file(fid);
-    strcat(cmd, fid);
-    strcat(cmd, " ");
-    strcat(cmd, cluster_info[cluster].filename);
-    system(cmd);
-    
-    if ( ((fd = open(cluster_info[cluster].filename, O_RDONLY)) >= 0) ) {
-        for (i = cluster;
-             i < (cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0)));
-             i++)
-        {
-            cluster_info[i].attr = ATTR_FILE;
-            cluster_info[i].cluster_no = i - cluster;
-            read(fd, cluster_info[i].buffer, FAT_CLUSTER_SIZE);
-            strcpy(cluster_info[i].fid, fid);
-        }
-        
-        close(fd);
+    if ( (res_code = download_file(fid)) != OK ) {
+        show_response_msg(res_code);
     }
+    else {
+        int i;
+        int fd;
+        char cmd[CMD_LEN_FULL] = "mv ";
+        
+        entry->attr = FAT_ENTRY_FILE;
+        entry->size = fsize;
+        
+        strcat(cmd, fid);
+        strcat(cmd, " ");
+        strcat(cmd, cluster_info[cluster].filename);
+        system(cmd);
+        
+        int no_endcluster = cluster + ((fsize / FAT_CLUSTER_SIZE) + ((fsize % FAT_CLUSTER_SIZE) ? 1 : 0));
+        if (((fd = open(cluster_info[cluster].filename, O_RDONLY)) >= 0)) {
+            for (i = cluster; i < no_endcluster; i++) {
+                cluster_info[i].attr = ATTR_FILE;
+                cluster_info[i].cluster_no = i - cluster;
+                read(fd, cluster_info[i].buffer, FAT_CLUSTER_SIZE);
+                strcpy(cluster_info[i].fid, fid);
+            }
+            
+            close(fd);
+        }
+    }
+    
+    return res_code;
 }
 
 void set_entry_filename(struct fat_dir_entry *entry, char *filename)
@@ -132,9 +143,9 @@ void set_dir_entry_info(struct fat_dir_entry *entry, int cluster, char *full_pat
     strcpy(cluster_info[cluster].filename, filename);
     
     if (dir)
-        record_entry_dir(entry, cluster);
+        return record_entry_dir(entry, cluster);
     else
-        record_entry_file(entry, cluster, fid, fsize);
+        return record_entry_file(entry, cluster, fid, fsize);
 }
 
 void sync_with_cloud()
@@ -153,16 +164,13 @@ void sync_with_cloud()
     // Receive information from Google Drive via pipe
     read_pipe(filelist);
     
-    while(!is_end_of_filelist(filelist, offset))
-    {
+    while( !is_end_of_filelist(filelist, offset) ) {
         sscanf(filelist+offset, "%512s %u %s %d", full_path, &fsize, fid, &dir);
         
-        // Write on allocation table
-        write_fat_area(cluster, fsize);
-        
-        set_dir_entry_info(&entry, cluster, full_path, fid, fsize, dir);
-        
-        insert_dir_entry(cluster_info[FAT_ROOT_DIR_FIRST_CLUSTER].buffer, &entry);
+        if (record_dir_entry_info(&entry, cluster, full_path, fid, fsize, dir) == OK) {
+            write_fat_area(cluster, fsize);
+            insert_dir_entry(cluster_info[FAT_ROOT_DIR_FIRST_CLUSTER].buffer, &entry);
+        }
         
         cluster = search_next_empty_cluster(cluster, fsize);
         offset = search_next_filelist_offset(filelist, offset);
